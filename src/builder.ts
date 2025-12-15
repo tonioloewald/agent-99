@@ -1,5 +1,8 @@
 import { coreAtoms, type Atom } from './runtime'
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+type _AtomMap = typeof coreAtoms
+
 // --- AST Types ---
 
 export type OpCode = string
@@ -23,15 +26,13 @@ export interface ArgRef {
 
 // --- Typed Builder ---
 
-type AtomMap = typeof coreAtoms
-
 // Helper to extract input type from Atom definition
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 type AtomInput<T> = T extends Atom<infer I, any> ? I : never
 
 // The Builder instance type with dynamic methods inferred from AtomMap
 type BuilderMethods<M extends Record<string, Atom<any, any>>> = {
-  // input is optional to allow atoms like uuid() that take no arguments
-  [K in keyof M as M[K]['op']]: (input?: AtomInput<M[K]>) => BuilderType<M>
+  [K in keyof M as M[K]['op']]: (input: AtomInput<M[K]>) => BuilderType<M>
 }
 
 // Control Flow Extensions (Custom signatures)
@@ -114,7 +115,9 @@ export class TypedBuilder<M extends Record<string, Atom<any, any>>> {
   return(schema: any): BuilderType<M> {
     const atom = this.atoms['return']
     if (!atom) throw new Error("Atom 'return' not found")
-    return this.add(atom.create({ schema: schema.schema ?? schema }))
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const _schema = schema.schema ?? schema
+    return this.add(atom.create({ schema: _schema }))
   }
 
   toJSON(): SeqNode {
@@ -231,7 +234,7 @@ export type BuilderType<M extends Record<string, Atom<any, any>>> =
 
 export const A99 = {
   // Create a builder with default core atoms
-  take(schema?: any): BuilderType<typeof coreAtoms> {
+  take(_schema?: any): BuilderType<typeof coreAtoms> {
     return new TypedBuilder(coreAtoms) as any
   },
 

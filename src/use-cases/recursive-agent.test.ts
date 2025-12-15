@@ -1,9 +1,10 @@
-import { describe, it, expect, mock } from 'bun:test'
+import { describe, it, expect } from 'bun:test'
 import { A99 } from '../builder'
-import { VM, AgentVM } from '../runtime'
+import { AgentVM } from '../runtime'
 import { s } from 'tosijs-schema'
 
 describe('Use Case: Recursive Agent', () => {
+  const VM = new AgentVM()
   it('should implement a recursive factorial agent', async () => {
     // Defines a factorial agent that calls itself recursively using 'agent.run'
     // Factorial(n):
@@ -98,11 +99,9 @@ describe('Use Case: Recursive Agent', () => {
             .as('subResult')
       )
 
-    let depth = 0
     const caps = {
       agent: {
         run: async (agentId: string, input: any) => {
-          depth++
           // Decrease fuel dramatically
           return VM.run(factorial.toJSON(), input, {
             capabilities: caps,

@@ -1,9 +1,11 @@
 import { describe, it, expect, mock } from 'bun:test'
 import { A99 } from './builder'
-import { VM } from './runtime'
+import { AgentVM } from './runtime'
 import { s } from 'tosijs-schema'
 
 describe('Agent99 Integration (Mocked Pipeline)', () => {
+  const VM = new AgentVM()
+
   it('should execute a Credit Limit Check flow using Store and If/Else', async () => {
     // --- 1. Mock Capabilities ---
     const mockStore: Record<string, number> = {
@@ -17,7 +19,7 @@ describe('Agent99 Integration (Mocked Pipeline)', () => {
           // noop
         }),
       },
-      fetch: mock(async (_url) => ({ status: 'ok' })),
+      fetch: mock(async () => ({ status: 'ok' })),
     }
 
     // --- 2. Build The Logic ---

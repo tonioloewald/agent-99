@@ -1,5 +1,5 @@
 import { s } from 'tosijs-schema'
-import { defineAtom, type RuntimeContext } from '../runtime'
+import { defineAtom } from '../runtime'
 
 // --- Capabilities ---
 

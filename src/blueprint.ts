@@ -7,7 +7,7 @@ that visualizes an agent execution in the browser.
 
 import type { XinBlueprint } from 'tosijs'
 import { A99 } from './builder'
-import { VM } from './runtime'
+import { AgentVM } from './runtime'
 import { s } from 'tosijs-schema'
 import { createBrowserCapabilities } from './atoms/browser'
 
@@ -25,13 +25,13 @@ export const blueprint: XinBlueprint = async (tag, factory) => {
     // Reads a number from the input, adds tax, and returns it.
     private agentLogic = A99.take(s.object({ inputVal: s.number }))
       // 1. Calculate Tax
-      ['math.calc']({
+      .mathCalc({
         expr: 'inputVal * 0.2',
         vars: { inputVal: A99.args('inputVal') },
       })
       .as('tax')
       // 2. Calculate Total
-      ['math.calc']({
+      .mathCalc({
         expr: 'inputVal + tax',
         vars: {
           inputVal: A99.args('inputVal'),
@@ -62,7 +62,8 @@ export const blueprint: XinBlueprint = async (tag, factory) => {
 
         // 2. Run VM
         const start = performance.now()
-        const res = await VM.run(
+        const vm = new AgentVM()
+        const res = await vm.run(
           this.agentLogic.toJSON(),
           { inputVal: val },
           {

@@ -1,14 +1,18 @@
 import { describe, it, expect, mock } from 'bun:test'
 import { A99 } from '../builder'
-import { VM } from '../runtime'
+import { AgentVM } from '../runtime'
 import { s } from 'tosijs-schema'
 
 describe('Use Case: Caching Proxy', () => {
+  const VM = new AgentVM()
+
   it('should fetch from source on cache miss and cache the result', async () => {
     const caps = {
       store: {
         get: mock(async () => null), // Cache Miss
-        set: mock(async () => {}),
+        set: mock(async () => {
+          // noop
+        }),
       },
       fetch: mock(async () => ({ data: 'fresh' })),
     }
@@ -50,7 +54,9 @@ describe('Use Case: Caching Proxy', () => {
     const caps = {
       store: {
         get: mock(async () => ({ data: 'cached' })), // Cache Hit
-        set: mock(async () => {}),
+        set: mock(async () => {
+          // noop
+        }),
       },
       fetch: mock(async () => ({ data: 'fresh' })),
     }
@@ -105,7 +111,9 @@ describe('Use Case: Caching Proxy', () => {
     const caps = {
       store: {
         get: mock(async () => null),
-        set: mock(async () => {}),
+        set: mock(async () => {
+          // noop
+        }),
       },
       fetch: mock(async (url) => ({ data: `fresh for ${url}` })),
     }

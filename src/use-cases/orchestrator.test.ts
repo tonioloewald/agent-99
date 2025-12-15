@@ -9,7 +9,7 @@ describe('Use Case: Orchestrator', () => {
     // Request "item_0": Success
     // Request "item_1": Fails once, then Success
     // Request "item_2": Fails always
-    let attempts = { item_0: 0, item_1: 0, item_2: 0 }
+    const attempts = { item_0: 0, item_1: 0, item_2: 0 }
     
     const caps = {
       fetch: mock(async (url) => {
@@ -32,7 +32,9 @@ describe('Use Case: Orchestrator', () => {
       'sleep',
       s.object({ ms: s.number }),
       undefined,
-      async () => {}, // Instant
+      async () => {
+        // noop
+      }, // Instant
       { docs: 'Sleep', timeoutMs: 100 }
     )
 
@@ -57,11 +59,10 @@ describe('Use Case: Orchestrator', () => {
           
           // Retry Loop (max 3 attempts)
           .while('!success && attempts < 3', { success: 'success', attempts: 'attempts' }, (retry) => 
-            retry
-              .try({
-                try: (t) => 
-                  t
-                    .httpFetch({ url: 'currentItem' })
+            retry.try({
+              try: (t) =>
+                t
+                  .httpFetch({ url: 'currentItem' })
                     .as('fetchRes')
                     .varSet({ key: 'result', value: 'fetchRes' })
                     .varSet({ key: 'success', value: true }),
@@ -71,7 +72,7 @@ describe('Use Case: Orchestrator', () => {
                     .mathCalc({ expr: 'attempts + 1', vars: { attempts: 'attempts' } })
                     .as('attempts')
                     // Wait before retry
-                    ['sleep']({ ms: 100 })
+                    .step({ op: 'sleep', ms: 100 })
               })
           )
           

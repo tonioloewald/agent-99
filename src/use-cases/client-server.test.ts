@@ -1,9 +1,10 @@
 import { describe, it, expect, beforeAll, afterAll } from 'bun:test'
 import { A99 } from '../builder'
-import { VM } from '../runtime'
+import { AgentVM } from '../runtime'
 import { s } from 'tosijs-schema'
 
 describe('Use Case: Client-Server', () => {
+  const VM = new AgentVM()
   let server: any
   const PORT = 3099
   const URL = `http://localhost:${PORT}`
@@ -21,7 +22,9 @@ describe('Use Case: Client-Server', () => {
             const capabilities = {
               store: {
                 get: async (key: string) => `Server Value for ${key}`,
-                set: async () => {},
+                set: async () => {
+                  // noop
+                },
               },
             }
 

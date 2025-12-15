@@ -1,9 +1,11 @@
 import { describe, it, expect, mock } from 'bun:test'
 import { A99 } from '../builder'
-import { VM } from '../runtime'
+import { AgentVM } from '../runtime'
 import { s } from 'tosijs-schema'
 
 describe('Simple Examples', () => {
+  const VM = new AgentVM()
+
   it('should compute Nth Fibonacci Number (Recursive/Iterative)', async () => {
     // We implement iterative for simplicity without recursion support yet
     // fib(n):
@@ -15,7 +17,8 @@ describe('Simple Examples', () => {
     //     n = n - 1
     //   return a
 
-    const fib = A99.take(s.object({ n: s.number }))
+    // const fib = A99.take(s.object({ n: s.number }))
+    A99.take(s.object({ n: s.number }))
       .varSet({ key: 'a', value: 0 })
       .varSet({ key: 'b', value: 1 })
       .while('n > 0', { n: 'args.n' }, (loop) =>
@@ -33,7 +36,8 @@ describe('Simple Examples', () => {
       // If we set "args.n", it sets a state key "args.n", but reads might prioritize ctx.args.
       // Let's use local variables.
 
-    const fibIterative = A99.take(s.object({ n: s.number }))
+    // const fibIterative = A99.take(s.object({ n: s.number }))
+    A99.take(s.object({ n: s.number }))
       .varSet({ key: 'currentN', value: A99.args('n') })
       .varSet({ key: 'a', value: 0 })
       .varSet({ key: 'b', value: 1 })
@@ -89,7 +93,7 @@ describe('Simple Examples', () => {
     const caps = {
       fetch: mock(async () => '<users><user id="1"><name>Alice</name><role>admin</role></user></users>'),
       xml: {
-        parse: mock(async (xml) => ({
+        parse: mock(async (_xml) => ({
           users: {
             user: [
               { id: '1', name: 'Alice', role: 'admin' }

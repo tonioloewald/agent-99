@@ -1,6 +1,6 @@
 import { describe, it, expect, mock } from 'bun:test'
 import { A99 } from '../builder'
-import { VM, AgentVM } from '../runtime'
+import { AgentVM } from '../runtime'
 import { s } from 'tosijs-schema'
 
 describe('Use Case: RAG Processor', () => {
@@ -19,7 +19,9 @@ describe('Use Case: RAG Processor', () => {
       },
       store: {
         get: mock(async () => null),
-        set: mock(async () => {}),
+        set: mock(async () => {
+          // noop
+        }),
         vectorSearch: mock(async (vector) => {
           // Verify vector passed
           if (vector[0] === 0.1) {
@@ -95,7 +97,7 @@ describe('Use Case: RAG Processor', () => {
       inputSchema: s.any,
       create: (input: any) => ({ op: 'llmEmbed', ...input }),
       exec: async (step: any, ctx: any) => {
-        const text = ctx.args[step.text.path] // Manual resolve for now or assume simple arg ref
+        // const text = ctx.args[step.text.path] // Manual resolve for now or assume simple arg ref
         // We need robust resolve?
         // Since we can't import resolveValue, we rely on ctx.capabilities.llm.embed
         // But wait, 'text' in step might be 'args.query' string if resolved by builder?
@@ -158,7 +160,9 @@ describe('Use Case: RAG Processor', () => {
       },
       store: {
         get: mock(async () => null),
-        set: mock(async () => {}),
+        set: mock(async () => {
+          // noop
+        }),
         vectorSearch: mock(async (vector) => {
           if (vector[0] === 0.1)
             return [{ id: 'doc1', content: 'Paris is a city.' }]
@@ -174,7 +178,7 @@ describe('Use Case: RAG Processor', () => {
       inputSchema: s.any,
       create: (input: any) => ({ op: 'llmEmbed', ...input }),
       exec: async (step: any, ctx: any) => {
-        const text = ctx.args[step.text.path]
+        // const text = ctx.args[step.text.path]
         const val = step.text
         const resolved =
           val?.$kind === 'arg' ? ctx.args[val.path] : ctx.state[val] ?? val

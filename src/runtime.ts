@@ -1,4 +1,4 @@
-import { s, type Infer, validate } from 'tosijs-schema'
+import { s, validate } from 'tosijs-schema'
 import type { BaseNode } from './builder'
 import jsep from 'jsep'
 
@@ -48,6 +48,7 @@ export interface AtomDef {
   cost?: number
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export interface Atom<I, O> extends AtomDef {
   create(input: I): I & { op: string }
 }
@@ -141,15 +142,15 @@ function evaluateJsep(node: any, context: Record<string, any>): any {
 
     case 'MemberExpression': {
       const obj = evaluateJsep(node.object, context)
-      const prop = node.computed 
+      const prop = node.computed
         ? evaluateJsep(node.property, context)
         : node.property.name
-        
+
       // Security Check: Block prototype access
       if (prop === '__proto__' || prop === 'constructor' || prop === 'prototype') {
         throw new Error(`Security Error: Access to '${prop}' is forbidden`)
       }
-      
+
       return obj?.[prop]
     }
 
@@ -196,6 +197,7 @@ export function defineAtom<I extends Record<string, any>, O = any>(
     if ((ctx.fuel -= cost) <= 0) throw new Error('Out of Fuel')
 
     // 2. Validation (Strip metadata before validation)
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { op: _op, result: _res, ...inputData } = step
     if (inputSchema && !validate(inputSchema, inputData)) {
       // In production: detailed diagnostics
@@ -205,8 +207,8 @@ export function defineAtom<I extends Record<string, any>, O = any>(
     // 3. Execution with Timeout
     let timer: any
     const execute = async () => fn(step as I, ctx)
-    
-    const result = timeoutMs > 0 
+
+    const result = timeoutMs > 0
       ? await Promise.race([
           execute(),
           new Promise<never>((_, reject) => {
@@ -259,11 +261,12 @@ export const iff = defineAtom('if', s.object({ condition: s.string, vars: s.reco
 }, { docs: 'If/Else', timeoutMs: 0, cost: 0.1 })
 
 export const whileLoop = defineAtom('while', s.object({ condition: s.string, vars: s.record(s.any), body: s.array(s.any) }), undefined, async (step, ctx) => {
+  // eslint-disable-next-line no-constant-condition
   while (true) {
     if (ctx.fuel <= 0) throw new Error('Out of Fuel')
     const vars: Record<string, any> = {}
     for (const [k, v] of Object.entries(step.vars)) vars[k] = resolveValue(v, ctx)
-    
+
     if (!evaluateExpression(step.condition, vars)) break
     await seq.exec({ op: 'seq', steps: step.body } as any, ctx)
     if (ctx.output !== undefined) return
@@ -311,7 +314,7 @@ export const scope = defineAtom('scope', s.object({ steps: s.array(s.any) }), un
 }, { docs: 'Create new scope', timeoutMs: 0, cost: 0.1 })
 
 // 3. Logic (Basic boolean ops - Low cost 0.1)
-const binaryLogic = (op: string, fn: (a: any, b: any) => boolean) => 
+const binaryLogic = (op: string, fn: (a: any, b: any) => boolean) =>
   defineAtom(op, s.object({ a: s.any, b: s.any }), s.boolean, async ({ a, b }, ctx) => fn(resolveValue(a, ctx), resolveValue(b, ctx)), { docs: 'Logic', cost: 0.1 })
 
 export const eq = binaryLogic('eq', (a, b) => a == b)
@@ -401,10 +404,10 @@ export const llmPredict = defineAtom('llmPredict', s.object({ prompt: s.string, 
 
 export const agentRun = defineAtom('agentRun', s.object({ agentId: s.string, input: s.any }), s.any, async ({ agentId, input }, ctx) => {
   if (!ctx.capabilities.agent?.run) throw new Error("Capability 'agent.run' missing")
-  
+
   const resolvedId = resolveValue(agentId, ctx)
   const rawInput = resolveValue(input, ctx)
-  
+
   let resolvedInput = rawInput
   if (rawInput && typeof rawInput === 'object' && !Array.isArray(rawInput)) {
     resolvedInput = {}
@@ -425,11 +428,11 @@ export const xmlParse = defineAtom('xmlParse', s.object({ str: s.string }), s.an
 }, { docs: 'Parse XML', cost: 1 })
 
 // 12. Utils
-export const random = defineAtom('random', s.object({ 
-  min: s.number.optional, 
-  max: s.number.optional, 
-  format: s.string.optional, 
-  length: s.number.optional 
+export const random = defineAtom('random', s.object({
+  min: s.number.optional,
+  max: s.number.optional,
+  format: s.string.optional,
+  length: s.number.optional
 }), s.any, async ({ min, max, format, length }, ctx) => {
   const f = resolveValue(format, ctx) ?? 'float'
   const len = resolveValue(length, ctx) ?? 10
@@ -523,16 +526,13 @@ export class AgentVM {
     }
 
     if (ast.op !== 'seq') throw new Error("Root AST must be 'seq'")
-    
+
     // Boot
     await this.resolve('seq')?.exec(ast, ctx)
-    
+
     return {
       result: ctx.output,
       fuelUsed: startFuel - ctx.fuel
     }
   }
 }
-
-// Global default instance for backward compatibility
-export const VM = new AgentVM()

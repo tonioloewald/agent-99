@@ -1,6 +1,6 @@
 import { describe, it, expect, mock } from 'bun:test'
 import { A99 } from '../builder'
-import { AgentVM, defineAtom } from '../runtime'
+import { AgentVM } from '../runtime'
 import { s } from 'tosijs-schema'
 
 // --- Generators ---
@@ -31,8 +31,8 @@ const createOrchestrator = () =>
         .varSet({ key: 'success', value: false })
         .while('!success && attempts < 3', { success: 'success', attempts: 'attempts' }, (loop) =>
           loop.try({
-            try: (t) =>
-              t
+            try: (tBuilder) =>
+              tBuilder
                 .httpFetch({ url: 'item' })
                 .as('res')
                 .varSet({ key: 'result', value: 'res' })
@@ -72,7 +72,7 @@ describe('Torture Test', () => {
             let a = 0,
               b = 1
             while (n-- > 0) {
-              let t = a + b
+              const t = a + b
               a = b
               b = t
             }
@@ -119,10 +119,10 @@ describe('Torture Test', () => {
       expect(res.success).toBe(true)
 
       if (res.task.type === 'fib') {
-        const expected = (res.task.expected as Function)(res.task.input.n)
+        const expected = (res.task.expected as (...args: any[]) => any)(res.task.input.n)
         expect(res.data.result).toBe(expected)
       } else {
-        const expected = (res.task.expected as Function)(res.task.input)
+        const expected = (res.task.expected as (...args: any[]) => any)(res.task.input)
         expect(res.data.results).toEqual(expected)
       }
     })

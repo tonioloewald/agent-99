@@ -1,9 +1,11 @@
 import { describe, it, expect, mock } from 'bun:test'
 import { A99 } from '../builder'
-import { VM, AgentVM, defineAtom } from '../runtime'
+import { AgentVM, defineAtom } from '../runtime'
 import { s } from 'tosijs-schema'
 
 describe('Use Case: Malicious Actor', () => {
+  const VM = new AgentVM()
+
   it('should terminate infinite loops via Fuel limit', async () => {
     // Malicious Agent: Infinite Loop
     const infinite = A99.take(s.object({}))

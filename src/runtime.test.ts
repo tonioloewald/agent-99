@@ -1,9 +1,11 @@
 import { describe, it, expect } from 'bun:test'
-import { VM, defineAtom, AgentVM } from './runtime'
+import { defineAtom, AgentVM } from './runtime'
 import { A99 } from './builder'
 import { s } from 'tosijs-schema'
 
 describe('Agent99 Runtime (VM)', () => {
+  const vm = new AgentVM()
+
   it('should execute a manually constructed AST', async () => {
     // Manually constructing AST to test VM in isolation
     const ast = {
@@ -22,7 +24,7 @@ describe('Agent99 Runtime (VM)', () => {
       ],
     } as any
 
-    const result = await VM.run(ast, { val: 5 })
+    const result = await vm.run(ast, { val: 5 })
     expect(result.result).toEqual({ res: 15 })
   })
 
@@ -44,7 +46,7 @@ describe('Agent99 Runtime (VM)', () => {
     const ast = logic.toJSON()
 
     // 3. Run
-    const result = await VM.run(ast, { price: 100, tax: 0.2 })
+    const result = await vm.run(ast, { price: 100, tax: 0.2 })
 
     // 100 * 1.2 = 120
     expect(result.result).toBeDefined()
@@ -71,7 +73,7 @@ describe('Agent99 Runtime (VM)', () => {
       ],
     } as any
 
-    const result = await VM.run(ast, { a: 10, b: 20, c: 4 })
+    const result = await vm.run(ast, { a: 10, b: 20, c: 4 })
     expect(result.result.res).toBe(60)
   })
 
@@ -91,7 +93,7 @@ describe('Agent99 Runtime (VM)', () => {
     // Step 1: Fuel 2 -> 1. OK.
     // Step 2: Fuel 1 -> 0. OK.
     // Step 3: Fuel 0. Error.
-    expect(VM.run(ast, {}, { fuel: 2 })).rejects.toThrow('Out of Fuel')
+    expect(vm.run(ast, {}, { fuel: 2 })).rejects.toThrow('Out of Fuel')
   })
 
   it('should return strict subsets of state based on schema', async () => {
@@ -119,7 +121,7 @@ describe('Agent99 Runtime (VM)', () => {
       ],
     } as any
 
-    const result = await VM.run(ast, {})
+    const result = await vm.run(ast, {})
     expect(result.result.public).toBe(200)
     expect(result.result.secret).toBeUndefined()
   })

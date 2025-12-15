@@ -1,9 +1,10 @@
 import { describe, it, expect, mock } from 'bun:test'
 import { A99 } from '../builder'
-import { VM } from '../runtime'
+import { AgentVM } from '../runtime'
 import { s } from 'tosijs-schema'
 
 describe('Use Case: Random ID Storage', () => {
+  const VM = new AgentVM()
   // Shared store for persisting data between agent runs
   const db = new Map<string, any>()
   const caps = {
