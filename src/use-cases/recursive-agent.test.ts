@@ -11,40 +11,27 @@ describe('Use Case: Recursive Agent', () => {
     // else return n * Factorial(n - 1)
 
     const factorial = A99.take(s.object({ n: s.number }))
-      ['var.set']({ key: 'n', value: A99.args('n') })
+      .varSet({ key: 'n', value: A99.args('n') })
       .if(
         'n <= 1',
         { n: 'n' },
+        (b) => b.varSet({ key: 'result', value: 1 }).return(s.object({ result: s.number })),
         (b) =>
           b
-            ['var.set']({ key: 'result', value: 1 })
-            ['return']({ schema: s.object({ result: s.number }).schema }),
-        (b) =>
-          b
-            ['math.calc']({ expr: 'n - 1', vars: { n: 'n' } })
+            .mathCalc({ expr: 'n - 1', vars: { n: 'n' } })
             .as('nMinus1')
-            ['agent.run']({ agentId: 'factorial', input: { n: 'nMinus1' } })
+            .agentRun({ agentId: 'factorial', input: { n: 'nMinus1' } })
             .as('subResult')
             // subResult is { result: ... }
             // Extract result property from subResult
-            ['var.set']({ key: 'subValue', value: 'subResult.result' }) // Path resolution? No, runtime needs improvement or we use 'pick' or specific logic.
-            // Our resolveValue doesn't support dot notation for deep objects yet in 'var.set' input?
-            // "value: 'subResult.result'" -> resolves string 'subResult.result' unless handled.
-            // 'resolveValue' handles 'args.' prefix. But state lookup is simple key.
-            // We need to resolve 'subResult' then access .result.
-            // Let's use 'math.calc' or 'pick' or assume 'agent.run' returns simple value?
-            // 'agent.run' returns whatever 'return' atom returns.
-            // return atom returns object { result: number }.
-            // So subResult is { result: number }.
-            // We need subResult.result.
             // 'math.calc' can access properties via JSEP!
             // 'n * subResult.result'
-            ['math.calc']({
+            .mathCalc({
               expr: 'n * subResult.result',
               vars: { n: 'n', subResult: 'subResult' },
             })
             .as('result')
-            ['return']({ schema: s.object({ result: s.number }).schema })
+            .return(s.object({ result: s.number }))
       )
 
     // To run this, we need a VM that can handle 'agent.run' by invoking a new VM instance with the same logic.
@@ -60,7 +47,7 @@ describe('Use Case: Recursive Agent', () => {
             // Reuse logic.
             // Note: In real system, this might be a network call or separate process.
             // Here we just recursively call VM.run
-            return VM.run(
+            const res = await VM.run(
               factorial.toJSON(),
               input,
               {
@@ -71,6 +58,7 @@ describe('Use Case: Recursive Agent', () => {
                 // So infinite recursion is possible if depth < stack limit.
               }
             )
+            return res.result
           }
           throw new Error(`Unknown agent ${agentId}`)
         },
@@ -84,7 +72,7 @@ describe('Use Case: Recursive Agent', () => {
     )
 
     // 5! = 120
-    expect(result.result).toBe(120)
+    expect(result.result.result).toBe(120)
   })
 
   it('should enforce fuel limits across recursion if shared (Simulated)', async () => {
@@ -97,16 +85,16 @@ describe('Use Case: Recursive Agent', () => {
     // But we can simulate "out of fuel" by passing low fuel to recursive call.
 
     const factorial = A99.take(s.object({ n: s.number }))
-      ['var.set']({ key: 'n', value: A99.args('n') })
+      .varSet({ key: 'n', value: A99.args('n') })
       .if(
         'n <= 1',
         { n: 'n' },
-        (b) => b['var.set']({ key: 'result', value: 1 }).return(s.object({})),
+        (b) => b.varSet({ key: 'result', value: 1 }).return(s.object({})),
         (b) =>
           b
-            ['math.calc']({ expr: 'n - 1', vars: { n: 'n' } })
+            .mathCalc({ expr: 'n - 1', vars: { n: 'n' } })
             .as('nMinus1')
-            ['agent.run']({ agentId: 'factorial', input: { n: 'nMinus1' } })
+            .agentRun({ agentId: 'factorial', input: { n: 'nMinus1' } })
             .as('subResult')
       )
 

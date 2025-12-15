@@ -10,7 +10,7 @@ describe('Agent99 Builder', () => {
         tax: s.number,
       })
     )
-      ['math.calc']({
+      .mathCalc({
         expr: 'price * (1 + tax)',
         vars: {
           price: A99.args('price'),
@@ -26,7 +26,7 @@ describe('Agent99 Builder', () => {
     expect(ast.steps).toHaveLength(2) // calc + return
 
     const calcStep = ast.steps[0]
-    expect(calcStep.op).toBe('math.calc')
+    expect(calcStep.op).toBe('mathCalc')
     expect(calcStep.result).toBe('total')
     expect(calcStep.expr).toBe('price * (1 + tax)')
     expect(calcStep.vars).toEqual({
@@ -55,9 +55,9 @@ describe('Agent99 Builder', () => {
 
   it('should allow chaining multiple operations', () => {
     const chain = A99.take(s.object({ x: s.number }))
-      ['math.calc']({ expr: 'x * 2', vars: { x: A99.args('x') } })
+      .mathCalc({ expr: 'x * 2', vars: { x: A99.args('x') } })
       .as('doubleX')
-      ['math.calc']({
+      .mathCalc({
         expr: 'doubleX + 10',
         vars: { doubleX: A99.args('doubleX') },
       })

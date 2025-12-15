@@ -60,40 +60,38 @@ describe('Use Case: RAG Processor', () => {
       // 'llm.predict' IS in coreAtoms.
 
       // Let's build the flow.
-      .step({ op: 'llm.embed', text: A99.args('query') })
+      .step({ op: 'llmEmbed', text: A99.args('query') })
       .as('vector')
 
-      ['store.vectorSearch']({ vector: 'vector' })
+      .storeVectorSearch({ vector: 'vector' })
       .as('docs')
 
       // D. Construct Prompt
       // "Context: {{docs}}\nQuery: {{query}}"
       // docs is array of objects. Template atom stringifies?
       // JSON.stringify docs first?
-      ['json.stringify']({ value: 'docs' })
+      .jsonStringify({ value: 'docs' })
       .as('contextStr')
 
-      ['template']({
+      .template({
         tmpl: 'Context: {{context}}\nQuery: {{query}}',
         vars: { context: 'contextStr', query: A99.args('query') },
       })
       .as('prompt')
 
       // E. Generate
-      ['llm.predict']({ prompt: 'prompt' })
+      .llmPredict({ prompt: 'prompt' })
       .as('answer')
 
       // We want to return docs as sources
-      ['var.set']({ key: 'sources', value: 'docs' })
-      ['return']({
-        schema: s.object({ answer: s.any, sources: s.any }).schema,
-      })
+      .varSet({ key: 'sources', value: 'docs' })
+      .return(s.object({ answer: s.any, sources: s.any }))
 
     // 3. Define Custom Atom
     const embedAtom = {
-      op: 'llm.embed',
+      op: 'llmEmbed',
       inputSchema: s.any,
-      create: (input: any) => ({ op: 'llm.embed', ...input }),
+      create: (input: any) => ({ op: 'llmEmbed', ...input }),
       exec: async (step: any, ctx: any) => {
         const text = ctx.args[step.text.path] // Manual resolve for now or assume simple arg ref
         // We need robust resolve?
@@ -127,7 +125,7 @@ describe('Use Case: RAG Processor', () => {
     // AgentVM class is exported?
     // `export class AgentVM` in runtime.ts. Yes.
 
-    const customVM = new AgentVM({ 'llm.embed': embedAtom })
+    const customVM = new AgentVM({ llmEmbed: embedAtom })
 
     const result = await customVM.run(
       rag.toJSON(),
@@ -135,8 +133,8 @@ describe('Use Case: RAG Processor', () => {
       { capabilities: caps }
     )
 
-    expect(result.answer).toBe('Paris is the capital of France.')
-    expect(result.sources).toHaveLength(2)
+    expect(result.result.answer).toBe('Paris is the capital of France.')
+    expect(result.result.sources).toHaveLength(2)
     expect(caps.llm.embed).toHaveBeenCalledWith('Capital of France?')
   })
 })

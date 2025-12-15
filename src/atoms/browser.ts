@@ -17,7 +17,7 @@ export interface StorageCapabilities {
 
 // dom.text
 defineAtom(
-  'dom.text',
+  'domText',
   s.object({
     selector: s.string,
   }),
@@ -29,12 +29,12 @@ defineAtom(
     if (!el) throw new Error(`DOM: Element not found '${selector}'`)
     return el.textContent || ''
   },
-  'Get text content of a DOM element.'
+  { docs: 'Get text content of a DOM element.', cost: 1 }
 )
 
 // dom.value
 defineAtom(
-  'dom.value',
+  'domValue',
   s.object({
     selector: s.string,
   }),
@@ -46,12 +46,12 @@ defineAtom(
     if (!el) throw new Error(`DOM: Element not found '${selector}'`)
     return el.value || ''
   },
-  'Get value of a form element.'
+  { docs: 'Get value of a form element.', cost: 1 }
 )
 
 // dom.click
 defineAtom(
-  'dom.click',
+  'domClick',
   s.object({
     selector: s.string,
   }),
@@ -63,12 +63,12 @@ defineAtom(
     if (!el) throw new Error(`DOM: Element not found '${selector}'`)
     el.click()
   },
-  'Click a DOM element.'
+  { docs: 'Click a DOM element.', cost: 1 }
 )
 
 // dom.input
 defineAtom(
-  'dom.input',
+  'domInput',
   s.object({
     selector: s.string,
     value: s.string,
@@ -83,12 +83,12 @@ defineAtom(
     el.dispatchEvent(new Event('input', { bubbles: true }))
     el.dispatchEvent(new Event('change', { bubbles: true }))
   },
-  'Input text into a form element.'
+  { docs: 'Input text into a form element.', cost: 1 }
 )
 
 // localstorage.get
 defineAtom(
-  'localstorage.get',
+  'localStorageGet',
   s.object({
     key: s.string,
   }),
@@ -98,12 +98,12 @@ defineAtom(
     if (!caps) throw new Error("Capability Error: 'storage' is not available.")
     return caps.getItem(key) ?? undefined
   },
-  'Get a value from LocalStorage.'
+  { docs: 'Get a value from LocalStorage.', cost: 1 }
 )
 
 // localstorage.set
 defineAtom(
-  'localstorage.set',
+  'localStorageSet',
   s.object({
     key: s.string,
     value: s.string,
@@ -114,7 +114,7 @@ defineAtom(
     if (!caps) throw new Error("Capability Error: 'storage' is not available.")
     caps.setItem(key, value)
   },
-  'Set a value in LocalStorage.'
+  { docs: 'Set a value in LocalStorage.', cost: 1 }
 )
 
 // --- Default Browser Factory ---

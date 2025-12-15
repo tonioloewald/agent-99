@@ -14,21 +14,21 @@ describe('Use Case: Caching Proxy', () => {
     }
 
     const refinedProxy = A99.take(s.object({ url: s.string }))
-      ['store.get']({ key: 'args.url' }) // Use URL as key directly
+      .storeGet({ key: 'args.url' }) // Use URL as key directly
       .as('cached')
       .if(
         'cached != null',
         { cached: 'cached' },
         (b) =>
           b
-            ['var.set']({ key: 'result', value: 'cached' })
-            ['return']({ schema: s.object({ result: s.any }).schema })
+            .varSet({ key: 'result', value: 'cached' })
+            .return(s.object({ result: s.any }))
       )
-      ['http.fetch']({ url: A99.args('url') })
+      .httpFetch({ url: A99.args('url') })
       .as('fetched')
-      ['store.set']({ key: A99.args('url'), value: 'fetched' })
-      ['var.set']({ key: 'result', value: 'fetched' })
-      ['return']({ schema: s.object({ result: s.any }).schema })
+      .storeSet({ key: A99.args('url'), value: 'fetched' })
+      .varSet({ key: 'result', value: 'fetched' })
+      .return(s.object({ result: s.any }))
 
     // Execute Miss
     const resMiss = await VM.run(
@@ -43,7 +43,7 @@ describe('Use Case: Caching Proxy', () => {
       'http://api.data',
       { data: 'fresh' }
     )
-    expect(resMiss.result).toEqual({ data: 'fresh' })
+    expect(resMiss.result.result).toEqual({ data: 'fresh' })
   })
 
   it('should return cached value on cache hit without fetching', async () => {
@@ -56,20 +56,20 @@ describe('Use Case: Caching Proxy', () => {
     }
 
     const refinedProxy = A99.take(s.object({ url: s.string }))
-      ['store.get']({ key: 'args.url' })
+      .storeGet({ key: 'args.url' })
       .as('cached')
       .if(
         'cached != null',
         { cached: 'cached' },
         (b) =>
           b
-            ['var.set']({ key: 'result', value: 'cached' })
-            ['return']({ schema: s.object({ result: s.any }).schema })
+            .varSet({ key: 'result', value: 'cached' })
+            .return(s.object({ result: s.any }))
       )
-      ['http.fetch']({ url: A99.args('url') }) // Should not reach here
+      .httpFetch({ url: A99.args('url') }) // Should not reach here
       .as('fetched')
-      ['var.set']({ key: 'result', value: 'fetched' })
-      ['return']({ schema: s.object({ result: s.any }).schema })
+      .varSet({ key: 'result', value: 'fetched' })
+      .return(s.object({ result: s.any }))
 
     // Execute Hit
     const resHit = await VM.run(
@@ -80,6 +80,6 @@ describe('Use Case: Caching Proxy', () => {
 
     expect(caps.store.get).toHaveBeenCalled()
     expect(caps.fetch).not.toHaveBeenCalled()
-    expect(resHit.result).toEqual({ data: 'cached' })
+    expect(resHit.result.result).toEqual({ data: 'cached' })
   })
 })

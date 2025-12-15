@@ -28,7 +28,7 @@ describe('Agent99 Integration (Mocked Pipeline)', () => {
       })
     )
       // Get Limit
-      ['store.get']({ key: 'user:123:limit' })
+      .storeGet({ key: 'user:123:limit' })
       .as('limit') // Hardcoded key for MVP simplicity in builder args
 
       // Check Limit
@@ -40,17 +40,19 @@ describe('Agent99 Integration (Mocked Pipeline)', () => {
         },
         // THEN: Deny
         (b: any) =>
-          b['math.calc']({ expr: '0', vars: {} })
+          b
+            .mathCalc({ expr: '0', vars: {} })
             .as('approved') // 0 = false
-            ['http.fetch']({
+            .httpFetch({
               url: 'https://api.bank.com/log-denial',
               method: 'POST',
             }),
         // ELSE: Approve
         (b: any) =>
-          b['math.calc']({ expr: '1', vars: {} })
+          b
+            .mathCalc({ expr: '1', vars: {} })
             .as('approved') // 1 = true
-            ['http.fetch']({
+            .httpFetch({
               url: 'https://api.bank.com/log-approval',
               method: 'POST',
             })
@@ -68,7 +70,7 @@ describe('Agent99 Integration (Mocked Pipeline)', () => {
       { capabilities: caps }
     )
 
-    expect(resultDenied.approved).toBe(0)
+    expect(resultDenied.result.approved).toBe(0)
     expect(caps.fetch).toHaveBeenCalledWith(
       'https://api.bank.com/log-denial',
       expect.anything()
@@ -83,7 +85,7 @@ describe('Agent99 Integration (Mocked Pipeline)', () => {
       { capabilities: caps }
     )
 
-    expect(resultApproved.approved).toBe(1)
+    expect(resultApproved.result.approved).toBe(1)
     expect(caps.fetch).toHaveBeenCalledWith(
       'https://api.bank.com/log-approval',
       expect.anything()
@@ -92,14 +94,12 @@ describe('Agent99 Integration (Mocked Pipeline)', () => {
 
   it('should handle capability errors gracefully', async () => {
     const logic = A99.take(s.object({}))
-      ['http.fetch']({ url: 'https://google.com' }) // Needs fetch capability
+      .httpFetch({ url: 'https://google.com' }) // Needs fetch capability
       .return(s.object({}))
 
     const ast = logic.toJSON()
 
     // Run without capabilities
-    expect(VM.run(ast, {})).rejects.toThrow(
-      "Capability 'fetch' missing"
-    )
+    expect(VM.run(ast, {})).rejects.toThrow("Capability 'fetch' missing")
   })
 })

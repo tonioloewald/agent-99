@@ -5,32 +5,32 @@ import { s } from 'tosijs-schema'
 const chain = A99.take(s.object({ x: s.number }))
 
 // Should allow core atoms
-chain['math.calc']({
+chain.mathCalc({
   expr: 'x * 2',
   vars: { x: 'args.x' },
 })
 
-chain['http.fetch']({
+chain.httpFetch({
   url: 'https://example.com',
 })
 
 // Should allow chaining
-chain['var.set']({ key: 'foo', value: 'bar' })['var.get']({ key: 'foo' })
+chain.varSet({ key: 'foo', value: 'bar' }).varGet({ key: 'foo' })
 
 // 2. Custom Atom Builder Inference
 import { defineAtom } from './runtime'
 
 const myAtom = defineAtom(
-  'my.atom',
+  'myAtom',
   s.object({ count: s.number }),
   s.number,
   async ({ count }) => count + 1
 )
 
-const customAtoms = { 'my.atom': myAtom }
+const customAtoms = { myAtom }
 const customBuilder = A99.custom(customAtoms)
 
 // Should allow custom atom
-customBuilder['my.atom']({ count: 1 })
+customBuilder.myAtom({ count: 1 })
 
-// customBuilder['math.calc']({})
+// customBuilder.mathCalc({})

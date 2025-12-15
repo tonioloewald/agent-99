@@ -45,6 +45,7 @@ export interface AtomDef {
   exec: AtomExec
   docs?: string
   timeoutMs?: number
+  cost?: number
 }
 
 export interface Atom<I, O> extends AtomDef {
@@ -54,6 +55,12 @@ export interface Atom<I, O> extends AtomDef {
 export interface AtomOptions {
   docs?: string
   timeoutMs?: number
+  cost?: number
+}
+
+export interface RunResult {
+  result: any
+  fuelUsed: number
 }
 
 // --- Helpers ---
@@ -69,9 +76,6 @@ function createChildScope(ctx: RuntimeContext): RuntimeContext {
   }
 }
 
-/**
- * Resolves a value from args, state, or ArgRef.
- */
 function resolveValue(val: any, ctx: RuntimeContext): any {
   if (val && typeof val === 'object' && val.$kind === 'arg') {
     return ctx.args[val.path]
@@ -178,18 +182,21 @@ export function defineAtom<I extends Record<string, any>, O = any>(
   fn: (input: I, ctx: RuntimeContext) => Promise<O>,
   options: AtomOptions | string = {}
 ): Atom<I, O> {
-  const { docs = '', timeoutMs = 1000 } =
+  const { docs = '', timeoutMs = 1000, cost = 1 } =
     typeof options === 'string' ? { docs: options } : options
 
   const exec: AtomExec = async (step: any, ctx: RuntimeContext) => {
-    // 1. Validation (Strip metadata before validation)
+    // 1. Deduct Fuel
+    if ((ctx.fuel -= cost) <= 0) throw new Error('Out of Fuel')
+
+    // 2. Validation (Strip metadata before validation)
     const { op: _op, result: _res, ...inputData } = step
     if (inputSchema && !validate(inputSchema, inputData)) {
       // In production: detailed diagnostics
       throw new Error(`Atom '${op}' validation failed: ${JSON.stringify(inputData)}`)
     }
 
-    // 2. Execution with Timeout
+    // 3. Execution with Timeout
     let timer: any
     const execute = async () => fn(step as I, ctx)
     
@@ -202,7 +209,7 @@ export function defineAtom<I extends Record<string, any>, O = any>(
         ]).finally(() => clearTimeout(timer))
       : await execute()
 
-    // 3. Result
+    // 4. Result
     if (step.result && result !== undefined) {
       ctx.state[step.result] = result
     }
@@ -215,22 +222,22 @@ export function defineAtom<I extends Record<string, any>, O = any>(
     exec,
     docs,
     timeoutMs,
+    cost,
     create: (input: I) => ({ op, ...input }),
   }
 }
 
 // --- Core Atoms ---
 
-// 1. Flow
+// 1. Flow (Low cost: 0.1)
 export const seq = defineAtom('seq', s.object({ steps: s.array(s.any) }), undefined, async ({ steps }, ctx) => {
   for (const step of steps) {
-    if (ctx.fuel-- <= 0) throw new Error('Out of Fuel')
     if (ctx.output !== undefined) return // Return check
     const atom = ctx.resolver(step.op)
     if (!atom) throw new Error(`Unknown Atom: ${step.op}`)
     await atom.exec(step, ctx)
   }
-}, { docs: 'Sequence', timeoutMs: 0 })
+}, { docs: 'Sequence', timeoutMs: 0, cost: 0.1 })
 
 export const iff = defineAtom('if', s.object({ condition: s.string, vars: s.record(s.any), then: s.array(s.any), else: s.array(s.any).optional }), undefined, async (step, ctx) => {
   // Resolve vars from state if they are strings pointing to keys, or use literals
@@ -238,13 +245,12 @@ export const iff = defineAtom('if', s.object({ condition: s.string, vars: s.reco
   for (const [k, v] of Object.entries(step.vars)) {
      vars[k] = resolveValue(v, ctx)
   }
-  // JSEP returns any type, but if needs boolean
   if (evaluateExpression(step.condition, vars)) {
     await seq.exec({ op: 'seq', steps: step.then } as any, ctx)
   } else if (step.else) {
     await seq.exec({ op: 'seq', steps: step.else } as any, ctx)
   }
-}, { docs: 'If/Else', timeoutMs: 0 })
+}, { docs: 'If/Else', timeoutMs: 0, cost: 0.1 })
 
 export const whileLoop = defineAtom('while', s.object({ condition: s.string, vars: s.record(s.any), body: s.array(s.any) }), undefined, async (step, ctx) => {
   while (true) {
@@ -256,7 +262,7 @@ export const whileLoop = defineAtom('while', s.object({ condition: s.string, var
     await seq.exec({ op: 'seq', steps: step.body } as any, ctx)
     if (ctx.output !== undefined) return
   }
-}, { docs: 'While Loop', timeoutMs: 0 })
+}, { docs: 'While Loop', timeoutMs: 0, cost: 0.1 })
 
 export const ret = defineAtom('return', undefined, s.any, async (step: any, ctx) => {
   const res: any = {}
@@ -269,7 +275,7 @@ export const ret = defineAtom('return', undefined, s.any, async (step: any, ctx)
   }
   ctx.output = res
   return res
-}, 'Return')
+}, { docs: 'Return', cost: 0.1 })
 
 export const tryCatch = defineAtom('try', s.object({ try: s.array(s.any), catch: s.array(s.any).optional }), undefined, async (step, ctx) => {
   try {
@@ -280,27 +286,27 @@ export const tryCatch = defineAtom('try', s.object({ try: s.array(s.any), catch:
       await seq.exec({ op: 'seq', steps: step.catch } as any, ctx)
     }
   }
-}, { docs: 'Try/Catch', timeoutMs: 0 })
+}, { docs: 'Try/Catch', timeoutMs: 0, cost: 0.1 })
 
-// 2. State
-export const varSet = defineAtom('var.set', s.object({ key: s.string, value: s.any }), undefined, async ({ key, value }, ctx) => {
+// 2. State (Low cost: 0.1)
+export const varSet = defineAtom('varSet', s.object({ key: s.string, value: s.any }), undefined, async ({ key, value }, ctx) => {
   ctx.state[key] = resolveValue(value, ctx)
-}, 'Set Variable')
+}, { docs: 'Set Variable', cost: 0.1 })
 
-export const varGet = defineAtom('var.get', s.object({ key: s.string }), s.any, async ({ key }, ctx) => {
+export const varGet = defineAtom('varGet', s.object({ key: s.string }), s.any, async ({ key }, ctx) => {
   return resolveValue(key, ctx)
-}, 'Get Variable')
+}, { docs: 'Get Variable', cost: 0.1 })
 
 export const scope = defineAtom('scope', s.object({ steps: s.array(s.any) }), undefined, async ({ steps }, ctx) => {
   const scopedCtx = createChildScope(ctx)
   await seq.exec({ op: 'seq', steps } as any, scopedCtx)
   // Propagate output/return up
   if (scopedCtx.output !== undefined) ctx.output = scopedCtx.output
-}, { docs: 'Create new scope', timeoutMs: 0 })
+}, { docs: 'Create new scope', timeoutMs: 0, cost: 0.1 })
 
-// 3. Logic (Basic boolean ops)
+// 3. Logic (Basic boolean ops - Low cost 0.1)
 const binaryLogic = (op: string, fn: (a: any, b: any) => boolean) => 
-  defineAtom(op, s.object({ a: s.any, b: s.any }), s.boolean, async ({ a, b }, ctx) => fn(resolveValue(a, ctx), resolveValue(b, ctx)), 'Logic')
+  defineAtom(op, s.object({ a: s.any, b: s.any }), s.boolean, async ({ a, b }, ctx) => fn(resolveValue(a, ctx), resolveValue(b, ctx)), { docs: 'Logic', cost: 0.1 })
 
 export const eq = binaryLogic('eq', (a, b) => a == b)
 export const neq = binaryLogic('neq', (a, b) => a != b)
@@ -308,16 +314,16 @@ export const gt = binaryLogic('gt', (a, b) => a > b)
 export const lt = binaryLogic('lt', (a, b) => a < b)
 export const and = binaryLogic('and', (a, b) => !!(a && b))
 export const or = binaryLogic('or', (a, b) => !!(a || b))
-export const not = defineAtom('not', s.object({ value: s.any }), s.boolean, async ({ value }, ctx) => !resolveValue(value, ctx), 'Not')
+export const not = defineAtom('not', s.object({ value: s.any }), s.boolean, async ({ value }, ctx) => !resolveValue(value, ctx), { docs: 'Not', cost: 0.1 })
 
-// 4. Math
-export const calc = defineAtom('math.calc', s.object({ expr: s.string, vars: s.record(s.any) }), s.number, async ({ expr, vars }, ctx) => {
+// 4. Math (Cost 1)
+export const calc = defineAtom('mathCalc', s.object({ expr: s.string, vars: s.record(s.any) }), s.number, async ({ expr, vars }, ctx) => {
   const resolved: Record<string, any> = {}
   for (const [k, v] of Object.entries(vars)) resolved[k] = resolveValue(v, ctx)
   return evaluateExpression(expr, resolved)
-}, 'Math Calc')
+}, { docs: 'Math Calc', cost: 1 })
 
-// 5. List
+// 5. List (Cost 1)
 export const map = defineAtom('map', s.object({ items: s.array(s.any), as: s.string, steps: s.array(s.any) }), s.array(s.any), async ({ items, as, steps }, ctx) => {
   const results = []
   const resolvedItems = resolveValue(items, ctx)
@@ -329,29 +335,29 @@ export const map = defineAtom('map', s.object({ items: s.array(s.any), as: s.str
     results.push(scopedCtx.state['result'] ?? null)
   }
   return results
-}, { docs: 'Map Array', timeoutMs: 0 })
+}, { docs: 'Map Array', timeoutMs: 0, cost: 1 })
 
 export const push = defineAtom('push', s.object({ list: s.array(s.any), item: s.any }), s.array(s.any), async ({ list, item }, ctx) => {
   const resolvedList = resolveValue(list, ctx)
   const resolvedItem = resolveValue(item, ctx)
   if (Array.isArray(resolvedList)) resolvedList.push(resolvedItem)
   return resolvedList
-}, 'Push to Array')
+}, { docs: 'Push to Array', cost: 1 })
 
 export const len = defineAtom('len', s.object({ list: s.any }), s.number, async ({ list }, ctx) => {
   const val = resolveValue(list, ctx)
   return Array.isArray(val) || typeof val === 'string' ? val.length : 0
-}, 'Length')
+}, { docs: 'Length', cost: 1 })
 
-// 6. String
-export const split = defineAtom('split', s.object({ str: s.string, sep: s.string }), s.array(s.string), async ({ str, sep }, ctx) => resolveValue(str, ctx).split(resolveValue(sep, ctx)), 'Split String')
-export const join = defineAtom('join', s.object({ list: s.array(s.string), sep: s.string }), s.string, async ({ list, sep }, ctx) => resolveValue(list, ctx).join(resolveValue(sep, ctx)), 'Join String')
+// 6. String (Cost 1)
+export const split = defineAtom('split', s.object({ str: s.string, sep: s.string }), s.array(s.string), async ({ str, sep }, ctx) => resolveValue(str, ctx).split(resolveValue(sep, ctx)), { docs: 'Split String', cost: 1 })
+export const join = defineAtom('join', s.object({ list: s.array(s.string), sep: s.string }), s.string, async ({ list, sep }, ctx) => resolveValue(list, ctx).join(resolveValue(sep, ctx)), { docs: 'Join String', cost: 1 })
 export const template = defineAtom('template', s.object({ tmpl: s.string, vars: s.record(s.any) }), s.string, async ({ tmpl, vars }: { tmpl: string, vars: Record<string, any> }, ctx) => {
   const resolvedTmpl = resolveValue(tmpl, ctx)
   return resolvedTmpl.replace(/\{\{(\w+)\}\}/g, (_: string, key: string) => String(resolveValue(vars[key], ctx) ?? ''))
-}, 'String Template')
+}, { docs: 'String Template', cost: 1 })
 
-// 7. Object
+// 7. Object (Cost 1)
 export const pick = defineAtom('pick', s.object({ obj: s.record(s.any), keys: s.array(s.string) }), s.record(s.any), async ({ obj, keys }: { obj: Record<string, any>, keys: string[] }, ctx) => {
   const resolvedObj = resolveValue(obj, ctx)
   const resolvedKeys = resolveValue(keys, ctx)
@@ -360,34 +366,34 @@ export const pick = defineAtom('pick', s.object({ obj: s.record(s.any), keys: s.
     resolvedKeys.forEach((k: string) => res[k] = resolvedObj[k])
   }
   return res
-}, 'Pick Keys')
+}, { docs: 'Pick Keys', cost: 1 })
 
-export const merge = defineAtom('merge', s.object({ a: s.record(s.any), b: s.record(s.any) }), s.record(s.any), async ({ a, b }, ctx) => ({ ...resolveValue(a, ctx), ...resolveValue(b, ctx) }), 'Merge Objects')
-export const keys = defineAtom('keys', s.object({ obj: s.record(s.any) }), s.array(s.string), async ({ obj }, ctx) => Object.keys(resolveValue(obj, ctx) ?? {}), 'Object Keys')
+export const merge = defineAtom('merge', s.object({ a: s.record(s.any), b: s.record(s.any) }), s.record(s.any), async ({ a, b }, ctx) => ({ ...resolveValue(a, ctx), ...resolveValue(b, ctx) }), { docs: 'Merge Objects', cost: 1 })
+export const keys = defineAtom('keys', s.object({ obj: s.record(s.any) }), s.array(s.string), async ({ obj }, ctx) => Object.keys(resolveValue(obj, ctx) ?? {}), { docs: 'Object Keys', cost: 1 })
 
-// 8. IO
-export const fetch = defineAtom('http.fetch', s.object({ url: s.string, method: s.string.optional, headers: s.record(s.string).optional, body: s.any.optional }), s.any, async (step, ctx) => {
+// 8. IO (Cost 1)
+export const fetch = defineAtom('httpFetch', s.object({ url: s.string, method: s.string.optional, headers: s.record(s.string).optional, body: s.any.optional }), s.any, async (step, ctx) => {
   if (!ctx.capabilities.fetch) throw new Error("Capability 'fetch' missing")
   const url = resolveValue(step.url, ctx)
   const method = resolveValue(step.method, ctx)
   const headers = resolveValue(step.headers, ctx)
   const body = resolveValue(step.body, ctx)
   return ctx.capabilities.fetch(url, { method, headers, body })
-}, 'HTTP Fetch')
+}, { docs: 'HTTP Fetch', cost: 1 })
 
-// 9. Store
-export const storeGet = defineAtom('store.get', s.object({ key: s.string }), s.any, async ({ key }, ctx) => ctx.capabilities.store?.get(resolveValue(key, ctx)), 'Store Get')
-export const storeSet = defineAtom('store.set', s.object({ key: s.string, value: s.any }), undefined, async ({ key, value }, ctx) => ctx.capabilities.store?.set(resolveValue(key, ctx), resolveValue(value, ctx)), 'Store Set')
-export const storeQuery = defineAtom('store.query', s.object({ query: s.any }), s.array(s.any), async ({ query }, ctx) => ctx.capabilities.store?.query?.(resolveValue(query, ctx)) ?? [], 'Store Query')
-export const vectorSearch = defineAtom('store.vectorSearch', s.object({ vector: s.array(s.number) }), s.array(s.any), async ({ vector }, ctx) => ctx.capabilities.store?.vectorSearch?.(resolveValue(vector, ctx)) ?? [], 'Vector Search')
+// 9. Store (Cost 1)
+export const storeGet = defineAtom('storeGet', s.object({ key: s.string }), s.any, async ({ key }, ctx) => ctx.capabilities.store?.get(resolveValue(key, ctx)), { docs: 'Store Get', cost: 1 })
+export const storeSet = defineAtom('storeSet', s.object({ key: s.string, value: s.any }), undefined, async ({ key, value }, ctx) => ctx.capabilities.store?.set(resolveValue(key, ctx), resolveValue(value, ctx)), { docs: 'Store Set', cost: 1 })
+export const storeQuery = defineAtom('storeQuery', s.object({ query: s.any }), s.array(s.any), async ({ query }, ctx) => ctx.capabilities.store?.query?.(resolveValue(query, ctx)) ?? [], { docs: 'Store Query', cost: 1 })
+export const vectorSearch = defineAtom('storeVectorSearch', s.object({ vector: s.array(s.number) }), s.array(s.any), async ({ vector }, ctx) => ctx.capabilities.store?.vectorSearch?.(resolveValue(vector, ctx)) ?? [], { docs: 'Vector Search', cost: 1 })
 
-// 10. Agent
-export const llmPredict = defineAtom('llm.predict', s.object({ prompt: s.string, options: s.any.optional }), s.string, async ({ prompt, options }, ctx) => {
+// 10. Agent (Cost 1)
+export const llmPredict = defineAtom('llmPredict', s.object({ prompt: s.string, options: s.any.optional }), s.string, async ({ prompt, options }, ctx) => {
   if (!ctx.capabilities.llm?.predict) throw new Error("Capability 'llm.predict' missing")
   return ctx.capabilities.llm.predict(resolveValue(prompt, ctx), resolveValue(options, ctx))
-}, 'LLM Predict')
+}, { docs: 'LLM Predict', cost: 1 })
 
-export const agentRun = defineAtom('agent.run', s.object({ agentId: s.string, input: s.any }), s.any, async ({ agentId, input }, ctx) => {
+export const agentRun = defineAtom('agentRun', s.object({ agentId: s.string, input: s.any }), s.any, async ({ agentId, input }, ctx) => {
   if (!ctx.capabilities.agent?.run) throw new Error("Capability 'agent.run' missing")
   
   const resolvedId = resolveValue(agentId, ctx)
@@ -402,31 +408,31 @@ export const agentRun = defineAtom('agent.run', s.object({ agentId: s.string, in
   }
 
   return ctx.capabilities.agent.run(resolvedId, resolvedInput)
-}, 'Run Sub-Agent')
+}, { docs: 'Run Sub-Agent', cost: 1 })
 
-// 11. Parsing
-export const jsonParse = defineAtom('json.parse', s.object({ str: s.string }), s.any, async ({ str }, ctx) => JSON.parse(resolveValue(str, ctx)), 'Parse JSON')
-export const jsonStringify = defineAtom('json.stringify', s.object({ value: s.any }), s.string, async ({ value }, ctx) => JSON.stringify(resolveValue(value, ctx)), 'Stringify JSON')
-export const xmlParse = defineAtom('xml.parse', s.object({ str: s.string }), s.any, async ({ str }, ctx) => {
+// 11. Parsing (Cost 1)
+export const jsonParse = defineAtom('jsonParse', s.object({ str: s.string }), s.any, async ({ str }, ctx) => JSON.parse(resolveValue(str, ctx)), { docs: 'Parse JSON', cost: 1 })
+export const jsonStringify = defineAtom('jsonStringify', s.object({ value: s.any }), s.string, async ({ value }, ctx) => JSON.stringify(resolveValue(value, ctx)), { docs: 'Stringify JSON', cost: 1 })
+export const xmlParse = defineAtom('xmlParse', s.object({ str: s.string }), s.any, async ({ str }, ctx) => {
   if (!ctx.capabilities.xml?.parse) throw new Error("Capability 'xml.parse' missing")
   return ctx.capabilities.xml.parse(resolveValue(str, ctx))
-}, 'Parse XML')
+}, { docs: 'Parse XML', cost: 1 })
 
 
 // --- Exports ---
 
 export const coreAtoms = {
   seq, if: iff, while: whileLoop, return: ret, try: tryCatch,
-  'var.set': varSet, 'var.get': varGet, scope,
+  varSet, varGet, scope,
   eq, neq, gt, lt, and, or, not,
-  'math.calc': calc,
+  mathCalc: calc,
   map, push, len,
   split, join, template,
   pick, merge, keys,
-  'http.fetch': fetch,
-  'store.get': storeGet, 'store.set': storeSet, 'store.query': storeQuery, 'store.vectorSearch': vectorSearch,
-  'llm.predict': llmPredict, 'agent.run': agentRun,
-  'json.parse': jsonParse, 'json.stringify': jsonStringify, 'xml.parse': xmlParse
+  httpFetch: fetch,
+  storeGet, storeSet, storeQuery, storeVectorSearch: vectorSearch,
+  llmPredict, agentRun,
+  jsonParse, jsonStringify, xmlParse
 }
 
 // --- VM ---
@@ -442,9 +448,10 @@ export class AgentVM {
     return this.atoms[op]
   }
 
-  async run(ast: BaseNode, args: Record<string, any> = {}, options: { fuel?: number, capabilities?: Capabilities } = {}) {
+  async run(ast: BaseNode, args: Record<string, any> = {}, options: { fuel?: number, capabilities?: Capabilities } = {}): Promise<RunResult> {
+    const startFuel = options.fuel ?? 1000
     const ctx: RuntimeContext = {
-      fuel: options.fuel ?? 1000,
+      fuel: startFuel,
       args,
       state: {},
       capabilities: options.capabilities ?? {},
@@ -456,7 +463,11 @@ export class AgentVM {
     
     // Boot
     await this.resolve('seq')?.exec(ast, ctx)
-    return ctx.output
+    
+    return {
+      result: ctx.output,
+      fuelUsed: startFuel - ctx.fuel
+    }
   }
 }
 
