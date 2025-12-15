@@ -1,16 +1,58 @@
 # Agent99
 
-A secure, portable, and Turing-complete runtime for AI Agents and Services-as-Code.
+A **type-safe-by-design, cost-limited virtual machine** that enables the **safe execution of untrusted code** anywhere.
 
-Agent99 allows you to define complex logic chains, agents, and data pipelines using a fluent TypeScript builder. These definitions compile to a safe, JSON-serializable AST (Abstract Syntax Tree) that can be executed anywhere—browser, server, or edge—within a sandboxed Virtual Machine.
+It's **safe eval** in the cloud.
 
-## Features
+Agent99 allows you to define complex logic chains, agents, and data pipelines—_computer programs_—using a fluent TypeScript builder. These definitions compile to a safe, JSON-serializable AST (Abstract Syntax Tree) that can be executed in the browser, on the server, or at the edge.
 
-- **Environment Agnostic:** Runs in Node.js, Bun, Deno, and Browsers.
-- **Sandboxed VM:** No `eval()`. Safe math/logic parsing via `jsep`. Strict timeouts and gas limits.
-- **Type-Safe Builder:** Fluent API with TypeScript inference.
-- **JSON AST:** Logic is data. Serialize agents, send them over HTTP, or store them in a database.
-- **Capability-Based:** IO (Fetch, DB, AI) is injected at runtime, allowing perfect mocking and security control.
+### Why do you care?
+
+- **Service-as-a-Service:** Define a complete backend service—including database fetches, API calls, and logic—entirely as data, and execute it safely on a server.
+- **Agents-as-Data:** Build AI agents entirely as JSON objects. Send them to a server to run instantly—no deployment, no build steps, no spin-up time.
+- **Universal Runtime:** Run your agent logic in the browser for zero-latency UI updates, or move it to the server for heavy lifting. Because the AST is strongly typed JSON, it is easy to build a runtime for any language or hardware stack, or even compile it directly to LLVM.
+
+### The Holy Grail
+
+Agent99 solves fundamental problems in distributed computing:
+
+- **Safe "Useful Mining":** Allows distributed nodes to execute productive, arbitrary work safely (sandboxed & gas-limited).
+- **Code is Data:** Logic is defined as a portable AST, making execution language-agnostic and portable.
+- **Type-Safe Composition:** Build robust pipelines where inputs and outputs are strictly validated at every step.
+
+## Comparison: Agent99 vs LangChain
+
+Consider building a "Research Agent" that searches for a topic, summarizes it, critiques the summary, and refines the search if needed.
+
+### LangChain
+
+Requires defining Tools, PromptTemplates, Chains (or Graph nodes), and wiring them up with complex state management classes. To refine the logic, you must redeploy the application code.
+
+### Agent99
+
+The entire logic is a single, fluent expression that compiles to JSON. You can refine the agent's behavior by simply sending a new JSON payload to the server—no deployment required.
+
+```typescript
+// Research Agent: Search -> Summarize -> Critique -> Loop
+const agent = A99.take(s.object({ topic: s.string })).while(
+  '!good && tries < 3',
+  {},
+  (loop) =>
+    loop
+      .storeSearch({ query: 'topic' })
+      .as('results')
+      .llmPredict({ system: 'Summarize', user: 'results' })
+      .as('summary')
+      .llmPredict({ system: 'Critique', user: 'summary' })
+      .as('feedback')
+      .if(
+        'feedback == "OK"',
+        {},
+        (yes) => yes.varSet({ key: 'good', value: true }),
+        (no) => no.llmPredict({ system: 'Refine', user: 'topic' }).as('topic')
+      )
+)
+```
 
 ## Installation
 
@@ -124,11 +166,51 @@ const vm = new AgentVM({
 await vm.run(ast, args, { capabilities: batteries })
 ```
 
+### Structured Outputs
+
+You can request structured JSON responses (e.g., JSON Schema) using `responseFormat`:
+
+```typescript
+const logic = builder.llmPredictBattery({
+  system: 'Extract data.',
+  user: 'John Doe, 30',
+  responseFormat: {
+    type: 'json_schema',
+    json_schema: {
+      name: 'person',
+      schema: {
+        type: 'object',
+        properties: {
+          name: { type: 'string' },
+          age: { type: 'number' },
+        },
+        required: ['name', 'age'],
+      },
+    },
+  },
+})
+```
+
 ### Performance & Tree Shaking
 
 The core Agent99 runtime is extremely lightweight (~7KB gzipped).
 
 The "Batteries" dependencies (transformers, Orama) are **lazy-loaded**. This means the heavy dependencies are only downloaded or bundled if you explicitly import and use the battery capabilities. If you only use the core runtime, your application bundle remains small.
+
+## Self-Documentation for Agents
+
+The VM can describe itself to an LLM, generating an OpenAI-compatible Tool Schema for its registered atoms.
+
+```typescript
+// Get all tools
+const tools = vm.getTools()
+
+// Get only flow control tools
+const flowTools = vm.getTools('flow')
+
+// Get specific tools
+const myTools = vm.getTools(['httpFetch', 'mathCalc'])
+```
 
 ## Implementing Real-World Atoms
 

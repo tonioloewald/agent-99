@@ -144,6 +144,53 @@ describe('Batteries Included', () => {
     expect(result.result.response.content).toBe('Mock LLM Response')
   })
 
+  it('should pass response_format to LLM Battery', async () => {
+    const mockFetch = globalThis.fetch as any
+    mockFetch.mockImplementation(
+      async (url: string | URL | Request, init?: RequestInit) => {
+        const u = url.toString()
+        if (u.includes('/chat/completions')) {
+          const body = JSON.parse((init?.body as string) || '{}')
+          if (body.response_format) {
+            return new Response(
+              JSON.stringify({
+                choices: [
+                  {
+                    message: {
+                      content: JSON.stringify({
+                        format: body.response_format,
+                      }),
+                    },
+                  },
+                ],
+              })
+            )
+          }
+        }
+        return originalFetch(url, init)
+      }
+    )
+
+    const agent = A99.custom({ ...batteryVM['atoms'] })
+      .step({
+        op: 'llmPredictBattery',
+        system: 'Sys',
+        user: 'User',
+        responseFormat: { type: 'json_object' },
+      })
+      .as('response')
+      .return(s.object({ response: s.any }))
+
+    const result = await batteryVM.run(
+      agent.toJSON(),
+      {},
+      { capabilities: batteries }
+    )
+
+    const content = JSON.parse(result.result.response.content)
+    expect(content.format).toEqual({ type: 'json_object' })
+  })
+
   it('should pass tools to LLM Battery and handle tool calls', async () => {
     // 1. Setup Mock for Tool Response
     const mockFetch = globalThis.fetch as any

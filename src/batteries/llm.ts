@@ -4,7 +4,12 @@
  */
 
 interface LLMCapability {
-  predict(system: string, user: string, tools?: any[]): Promise<any>
+  predict(
+    system: string,
+    user: string,
+    tools?: any[],
+    responseFormat?: any
+  ): Promise<any>
   embed(text: string): Promise<number[]>
 }
 
@@ -12,7 +17,12 @@ const DEFAULT_BASE_URL = 'http://localhost:1234/v1'
 
 export function getLLMCapability(baseUrl = DEFAULT_BASE_URL): LLMCapability {
   return {
-    async predict(system: string, user: string, tools?: any[]): Promise<any> {
+    async predict(
+      system: string,
+      user: string,
+      tools?: any[],
+      responseFormat?: any
+    ): Promise<any> {
       try {
         const messages = [
           { role: 'system', content: system },
@@ -25,7 +35,8 @@ export function getLLMCapability(baseUrl = DEFAULT_BASE_URL): LLMCapability {
           body: JSON.stringify({
             messages,
             temperature: 0.7,
-            tools, // Pass tools if supported by local model
+            tools,
+            response_format: responseFormat,
           }),
         })
 

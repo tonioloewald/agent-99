@@ -315,9 +315,11 @@ export const iff = defineAtom(
   undefined,
   async (step, ctx) => {
     // Resolve vars from state if they are strings pointing to keys, or use literals
-    const vars: Record<string, any> = {}
-    for (const [k, v] of Object.entries(step.vars)) {
-      vars[k] = resolveValue(v, ctx)
+    const vars: Record<string, any> = { ...ctx.state }
+    if (step.vars) {
+      for (const [k, v] of Object.entries(step.vars)) {
+        vars[k] = resolveValue(v, ctx)
+      }
     }
     if (evaluateExpression(step.condition, vars)) {
       await seq.exec({ op: 'seq', steps: step.then } as any, ctx)
@@ -332,7 +334,7 @@ export const whileLoop = defineAtom(
   'while',
   s.object({
     condition: s.string,
-    vars: s.record(s.any),
+    vars: s.record(s.any).optional,
     body: s.array(s.any),
   }),
   undefined,
@@ -340,9 +342,11 @@ export const whileLoop = defineAtom(
     // eslint-disable-next-line no-constant-condition
     while (true) {
       if ((ctx.fuel.current -= 0.1) <= 0) throw new Error('Out of Fuel')
-      const vars: Record<string, any> = {}
-      for (const [k, v] of Object.entries(step.vars))
-        vars[k] = resolveValue(v, ctx)
+      const vars: Record<string, any> = { ...ctx.state }
+      if (step.vars) {
+        for (const [k, v] of Object.entries(step.vars))
+          vars[k] = resolveValue(v, ctx)
+      }
 
       if (!evaluateExpression(step.condition, vars)) break
       await seq.exec({ op: 'seq', steps: step.body } as any, ctx)
@@ -449,12 +453,14 @@ export const not = defineAtom(
 // 4. Math (Cost 1)
 export const calc = defineAtom(
   'mathCalc',
-  s.object({ expr: s.string, vars: s.record(s.any) }),
+  s.object({ expr: s.string, vars: s.record(s.any).optional }),
   s.number,
   async ({ expr, vars }, ctx) => {
-    const resolved: Record<string, any> = {}
-    for (const [k, v] of Object.entries(vars))
-      resolved[k] = resolveValue(v, ctx)
+    const resolved: Record<string, any> = { ...ctx.state }
+    if (vars) {
+      for (const [k, v] of Object.entries(vars))
+        resolved[k] = resolveValue(v, ctx)
+    }
     return evaluateExpression(expr, resolved)
   },
   { docs: 'Math Calc', cost: 1 }
@@ -930,6 +936,35 @@ export class AgentVM {
 
   resolve(op: string) {
     return this.atoms[op]
+  }
+
+  getTools(filter: 'flow' | 'all' | string[] = 'all') {
+    let targetAtoms = Object.values(this.atoms)
+
+    if (Array.isArray(filter)) {
+      targetAtoms = targetAtoms.filter((a) => filter.includes(a.op))
+    } else if (filter === 'flow') {
+      const flowOps = [
+        'seq',
+        'if',
+        'while',
+        'return',
+        'try',
+        'varSet',
+        'varGet',
+        'scope',
+      ]
+      targetAtoms = targetAtoms.filter((a) => flowOps.includes(a.op))
+    }
+
+    return targetAtoms.map((atom) => ({
+      type: 'function',
+      function: {
+        name: atom.op,
+        description: atom.docs,
+        parameters: atom.inputSchema?.schema ?? {},
+      },
+    }))
   }
 
   async run(

@@ -17,7 +17,12 @@ interface StoreBattery {
 }
 
 interface LLMBattery {
-  predict(system: string, user: string, tools?: any[]): Promise<any>
+  predict(
+    system: string,
+    user: string,
+    tools?: any[],
+    responseFormat?: any
+  ): Promise<any>
 }
 
 // --- Atoms ---
@@ -85,12 +90,13 @@ export const llmPredictBattery = defineAtom(
     system: s.string.optional,
     user: s.string,
     tools: s.array(s.any).optional,
+    responseFormat: s.any.optional,
   }),
   s.object({
     content: s.string.optional,
     tool_calls: s.array(s.any).optional,
   }),
-  async ({ system, user, tools }, ctx) => {
+  async ({ system, user, tools, responseFormat }, ctx) => {
     const llmCap = ctx.capabilities.llm as unknown as LLMBattery
     if (!llmCap?.predict)
       throw new Error("Capability 'llm' missing or invalid.")
@@ -99,8 +105,14 @@ export const llmPredictBattery = defineAtom(
       resolveValue(system, ctx) ?? 'You are a helpful agent.'
     const resolvedUser = resolveValue(user, ctx)
     const resolvedTools = resolveValue(tools, ctx)
+    const resolvedFormat = resolveValue(responseFormat, ctx)
 
-    return llmCap.predict(resolvedSystem, resolvedUser, resolvedTools)
+    return llmCap.predict(
+      resolvedSystem,
+      resolvedUser,
+      resolvedTools,
+      resolvedFormat
+    )
   },
   { docs: 'Generate completion using LLM battery', cost: 100 }
 )
