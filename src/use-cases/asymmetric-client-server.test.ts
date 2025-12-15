@@ -13,11 +13,13 @@ import {
 // but conceptually the server "has" them.
 const mockBatteries = {
   vector: {
-    embed: mock(async (text) => [0.9, 0.8, 0.7]),
+    embed: mock(async (_text) => [0.9, 0.8, 0.7]),
   },
   store: {
     get: mock(async () => null),
-    set: mock(async () => {}),
+    set: mock(async () => {
+      // noop
+    }),
     vectorSearch: mock(async (_coll, _vec) => [
       { id: '1', content: 'Secret Server Doc' },
     ]),
@@ -80,6 +82,7 @@ describe('Use Case: Asymmetric Client-Server', () => {
 
     // Note: In a real scenario, client imports definitions (types/schema) but not heavy deps.
     // Here we reuse the atom definitions from 'batteries.ts' for the builder schema.
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
     const { coreAtoms } = require('../runtime')
     const clientBuilder = A99.custom({
       ...coreAtoms,
@@ -151,6 +154,7 @@ describe('Use Case: Asymmetric Client-Server', () => {
       llmPredictBattery,
     })
 
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
     const { coreAtoms } = require('../runtime')
     const logic = A99.custom({ ...coreAtoms, storeVectorize })
       .step({ op: 'storeVectorize', text: 'fail' })

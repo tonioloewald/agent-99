@@ -20,13 +20,10 @@ describe('Use Case: Caching Proxy', () => {
     const refinedProxy = A99.take(s.object({ url: s.string }))
       .storeGet({ key: 'args.url' }) // Use URL as key directly
       .as('cached')
-      .if(
-        'cached != null',
-        { cached: 'cached' },
-        (b) =>
-          b
-            .varSet({ key: 'result', value: 'cached' })
-            .return(s.object({ result: s.any }))
+      .if('cached != null', { cached: 'cached' }, (b) =>
+        b
+          .varSet({ key: 'result', value: 'cached' })
+          .return(s.object({ result: s.any }))
       )
       .httpFetch({ url: A99.args('url') })
       .as('fetched')
@@ -43,10 +40,9 @@ describe('Use Case: Caching Proxy', () => {
 
     expect(caps.store.get).toHaveBeenCalled()
     expect(caps.fetch).toHaveBeenCalled()
-    expect(caps.store.set).toHaveBeenCalledWith(
-      'http://api.data',
-      { data: 'fresh' }
-    )
+    expect(caps.store.set).toHaveBeenCalledWith('http://api.data', {
+      data: 'fresh',
+    })
     expect(resMiss.result.result).toEqual({ data: 'fresh' })
   })
 
@@ -64,13 +60,10 @@ describe('Use Case: Caching Proxy', () => {
     const refinedProxy = A99.take(s.object({ url: s.string }))
       .storeGet({ key: 'args.url' })
       .as('cached')
-      .if(
-        'cached != null',
-        { cached: 'cached' },
-        (b) =>
-          b
-            .varSet({ key: 'result', value: 'cached' })
-            .return(s.object({ result: s.any }))
+      .if('cached != null', { cached: 'cached' }, (b) =>
+        b
+          .varSet({ key: 'result', value: 'cached' })
+          .return(s.object({ result: s.any }))
       )
       .httpFetch({ url: A99.args('url') }) // Should not reach here
       .as('fetched')
@@ -93,13 +86,10 @@ describe('Use Case: Caching Proxy', () => {
     const refinedProxy = A99.take(s.object({ url: s.string }))
       .storeGet({ key: 'args.url' })
       .as('cached')
-      .if(
-        'cached != null',
-        { cached: 'cached' },
-        (b) =>
-          b
-            .varSet({ key: 'result', value: 'cached' })
-            .return(s.object({ result: s.any }))
+      .if('cached != null', { cached: 'cached' }, (b) =>
+        b
+          .varSet({ key: 'result', value: 'cached' })
+          .return(s.object({ result: s.any }))
       )
       .httpFetch({ url: A99.args('url') })
       .as('fetched')

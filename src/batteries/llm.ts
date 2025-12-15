@@ -10,15 +10,9 @@ interface LLMCapability {
 
 const DEFAULT_BASE_URL = 'http://localhost:1234/v1'
 
-export function getLLMCapability(
-  baseUrl = DEFAULT_BASE_URL
-): LLMCapability {
+export function getLLMCapability(baseUrl = DEFAULT_BASE_URL): LLMCapability {
   return {
-    async predict(
-      system: string,
-      user: string,
-      tools?: any[]
-    ): Promise<any> {
+    async predict(system: string, user: string, tools?: any[]): Promise<any> {
       try {
         const messages = [
           { role: 'system', content: system },
@@ -36,7 +30,9 @@ export function getLLMCapability(
         })
 
         if (!response.ok) {
-          throw new Error(`LLM Error: ${response.status} ${response.statusText}`)
+          throw new Error(
+            `LLM Error: ${response.status} ${response.statusText}`
+          )
         }
 
         const data = await response.json()

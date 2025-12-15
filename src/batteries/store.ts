@@ -9,7 +9,12 @@ interface StoreCapability {
   set(key: string, val: any): Promise<void>
   createCollection(name: string, schema?: any): Promise<void>
   vectorAdd(collection: string, doc: any): Promise<void>
-  vectorSearch(collection: string, vector: number[], k?: number, filter?: any): Promise<any[]>
+  vectorSearch(
+    collection: string,
+    vector: number[],
+    k?: number,
+    filter?: any
+  ): Promise<any[]>
 }
 
 // In-memory KV store fallback
@@ -59,18 +64,27 @@ export function getStoreCapability(): StoreCapability {
       const { insert } = await getOrama()
       const db = collections.get(collection)
       if (!db)
-        throw new Error(`Collection '${collection}' not found. Create it first.`)
+        throw new Error(
+          `Collection '${collection}' not found. Create it first.`
+        )
 
       // We expect doc to contain the vector in 'embedding' field if schema requires it
       // or we just insert raw doc and hope schema matches.
       await insert(db, doc)
     },
 
-    async vectorSearch(collection: string, vector: number[], k = 5, filter?: any) {
+    async vectorSearch(
+      collection: string,
+      vector: number[],
+      k = 5,
+      filter?: any
+    ) {
       const { search } = await getOrama()
       const db = collections.get(collection)
       if (!db)
-        throw new Error(`Collection '${collection}' not found. Create it first.`)
+        throw new Error(
+          `Collection '${collection}' not found. Create it first.`
+        )
 
       const results = await search(db, {
         mode: 'vector',

@@ -30,11 +30,11 @@ describe('Simple Examples', () => {
           .mathCalc({ expr: 'n - 1', vars: { n: 'args.n' } })
           .as('args.n')
       ) // Mutate args.n? Or local n? args are immutable in standard interpretation usually?
-      // Our runtime allows referencing args. but not setting args explicitly via var.set easily unless key handles dot?
-      // var.set key is string. "args.n".
-      // Our runtime resolveVar checks "args." prefix. ctx.state[key] = value.
-      // If we set "args.n", it sets a state key "args.n", but reads might prioritize ctx.args.
-      // Let's use local variables.
+    // Our runtime allows referencing args. but not setting args explicitly via var.set easily unless key handles dot?
+    // var.set key is string. "args.n".
+    // Our runtime resolveVar checks "args." prefix. ctx.state[key] = value.
+    // If we set "args.n", it sets a state key "args.n", but reads might prioritize ctx.args.
+    // Let's use local variables.
 
     // const fibIterative = A99.take(s.object({ n: s.number }))
     A99.take(s.object({ n: s.number }))
@@ -56,7 +56,7 @@ describe('Simple Examples', () => {
     // But 'a' is in state. return atom maps schema keys to state.
     // So we need 'result' in state.
     // Let's modify the builder to map 'a' to 'result' at the end.
-    
+
     const fibFinal = A99.take(s.object({ n: s.number }))
       .varSet({ key: 'n', value: A99.args('n') })
       .varSet({ key: 'a', value: 0 })
@@ -80,7 +80,10 @@ describe('Simple Examples', () => {
 
   it('should concatenate strings', async () => {
     const concat = A99.take(s.object({ a: s.string, b: s.string }))
-      .template({ tmpl: '{{a}} {{b}}!', vars: { a: A99.args('a'), b: A99.args('b') } })
+      .template({
+        tmpl: '{{a}} {{b}}!',
+        vars: { a: A99.args('a'), b: A99.args('b') },
+      })
       .as('greeting')
       .return(s.object({ greeting: s.string }))
 
@@ -91,16 +94,17 @@ describe('Simple Examples', () => {
   it('should process XML to JSON with filtering', async () => {
     // Scenario: Fetch XML, Parse, Filter, Return
     const caps = {
-      fetch: mock(async () => '<users><user id="1"><name>Alice</name><role>admin</role></user></users>'),
+      fetch: mock(
+        async () =>
+          '<users><user id="1"><name>Alice</name><role>admin</role></user></users>'
+      ),
       xml: {
         parse: mock(async (_xml) => ({
           users: {
-            user: [
-              { id: '1', name: 'Alice', role: 'admin' }
-            ]
-          }
-        }))
-      }
+            user: [{ id: '1', name: 'Alice', role: 'admin' }],
+          },
+        })),
+      },
     }
 
     const logic = A99.take(s.object({ url: s.string }))
@@ -129,7 +133,9 @@ describe('Simple Examples', () => {
       .return(s.object({ filtered: s.array(s.any) }))
 
     // Adjust Mock
-    caps.xml.parse = mock(async () => ([{ id: '1', name: 'Alice', role: 'admin' }])) as any
+    caps.xml.parse = mock(async () => [
+      { id: '1', name: 'Alice', role: 'admin' },
+    ]) as any
 
     const result = await VM.run(
       logic.toJSON(),

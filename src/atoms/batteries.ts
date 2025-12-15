@@ -95,7 +95,8 @@ export const llmPredictBattery = defineAtom(
     if (!llmCap?.predict)
       throw new Error("Capability 'llm' missing or invalid.")
 
-    const resolvedSystem = resolveValue(system, ctx) ?? 'You are a helpful agent.'
+    const resolvedSystem =
+      resolveValue(system, ctx) ?? 'You are a helpful agent.'
     const resolvedUser = resolveValue(user, ctx)
     const resolvedTools = resolveValue(tools, ctx)
 

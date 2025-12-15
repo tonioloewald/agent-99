@@ -16,7 +16,10 @@ describe('Use Case: Recursive Agent', () => {
       .if(
         'n <= 1',
         { n: 'n' },
-        (b) => b.varSet({ key: 'result', value: 1 }).return(s.object({ result: s.number })),
+        (b) =>
+          b
+            .varSet({ key: 'result', value: 1 })
+            .return(s.object({ result: s.number })),
         (b) =>
           b
             .mathCalc({ expr: 'n - 1', vars: { n: 'n' } })
@@ -48,17 +51,13 @@ describe('Use Case: Recursive Agent', () => {
             // Reuse logic.
             // Note: In real system, this might be a network call or separate process.
             // Here we just recursively call VM.run
-            const res = await VM.run(
-              factorial.toJSON(),
-              input,
-              {
-                capabilities: caps, // Pass capabilities down
-                fuel: 100, // Reset fuel for sub-agent or share?
-                // If we want to test global fuel limit, we should share a fuel counter ref?
-                // Current VM takes `fuel: number` (by value).
-                // So infinite recursion is possible if depth < stack limit.
-              }
-            )
+            const res = await VM.run(factorial.toJSON(), input, {
+              capabilities: caps, // Pass capabilities down
+              fuel: 100, // Reset fuel for sub-agent or share?
+              // If we want to test global fuel limit, we should share a fuel counter ref?
+              // Current VM takes `fuel: number` (by value).
+              // So infinite recursion is possible if depth < stack limit.
+            })
             return res.result
           }
           throw new Error(`Unknown agent ${agentId}`)
@@ -128,7 +127,10 @@ describe('Use Case: Recursive Agent', () => {
       .if(
         'n <= 1',
         { n: 'n' },
-        (b) => b.varSet({ key: 'result', value: 1 }).return(s.object({ result: s.number })),
+        (b) =>
+          b
+            .varSet({ key: 'result', value: 1 })
+            .return(s.object({ result: s.number })),
         (b) =>
           b
             .mathCalc({ expr: 'n - 1', vars: { n: 'n' } })
@@ -163,9 +165,7 @@ describe('Use Case: Recursive Agent', () => {
     }
 
     const results = await Promise.all(
-      inputs.map((n) =>
-        VM.run(ast, { n }, { capabilities: caps, fuel: 1000 })
-      )
+      inputs.map((n) => VM.run(ast, { n }, { capabilities: caps, fuel: 1000 }))
     )
 
     const values = results.map((r) => r.result.result)

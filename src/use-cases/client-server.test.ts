@@ -81,7 +81,9 @@ describe('Use Case: Client-Server', () => {
     // store.get('secret_id') -> 'Server Value for secret_id'
     // template -> 'Echo: Server Value for secret_id'
     expect(response.status).toBe(200)
-    expect(data.result).toEqual({ response: 'Echo: Server Value for secret_id' })
+    expect(data.result).toEqual({
+      response: 'Echo: Server Value for secret_id',
+    })
     expect(data.fuelUsed).toBeGreaterThan(0)
   })
 

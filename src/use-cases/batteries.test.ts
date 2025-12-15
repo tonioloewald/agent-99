@@ -45,17 +45,19 @@ mock.module('@orama/orama', () => {
 // and return a fixed response. This verifies the battery correctly formats
 // the request and parses the response without needing a real LLM server.
 const originalFetch = globalThis.fetch
-globalThis.fetch = mock(async (url: string | URL | Request, init?: RequestInit) => {
-  const u = url.toString()
-  if (u.includes('/chat/completions')) {
-    return new Response(
-      JSON.stringify({
-        choices: [{ message: { content: 'Mock LLM Response' } }],
-      })
-    )
+globalThis.fetch = mock(
+  async (url: string | URL | Request, init?: RequestInit) => {
+    const u = url.toString()
+    if (u.includes('/chat/completions')) {
+      return new Response(
+        JSON.stringify({
+          choices: [{ message: { content: 'Mock LLM Response' } }],
+        })
+      )
+    }
+    return originalFetch(url, init)
   }
-  return originalFetch(url, init)
-}) as any
+) as any
 
 describe('Batteries Included', () => {
   // Create a VM with the Battery Atoms
@@ -145,34 +147,39 @@ describe('Batteries Included', () => {
   it('should pass tools to LLM Battery and handle tool calls', async () => {
     // 1. Setup Mock for Tool Response
     const mockFetch = globalThis.fetch as any
-    mockFetch.mockImplementation(async (url: string | URL | Request, init?: RequestInit) => {
-      const u = url.toString()
-      if (u.includes('/chat/completions')) {
-        // Inspect request body to verify tools
-        const req = url instanceof Request ? url : new Request(url, { method: 'POST' }) // Wait, fetch mock passed args?
-        // Actually, we can spy on the mock calls later.
-        // For now, return a tool call response.
-        return new Response(
-          JSON.stringify({
-            choices: [
-              {
-                message: {
-                  content: null,
-                  tool_calls: [
-                    {
-                      id: 'call_123',
-                      type: 'function',
-                      function: { name: 'get_weather', arguments: '{"city":"Paris"}' },
-                    },
-                  ],
+    mockFetch.mockImplementation(
+      async (url: string | URL | Request, init?: RequestInit) => {
+        const u = url.toString()
+        if (u.includes('/chat/completions')) {
+          // Inspect request body to verify tools
+          // const req = url instanceof Request ? url : new Request(url, { method: 'POST' }) // Wait, fetch mock passed args?
+          // Actually, we can spy on the mock calls later.
+          // For now, return a tool call response.
+          return new Response(
+            JSON.stringify({
+              choices: [
+                {
+                  message: {
+                    content: null,
+                    tool_calls: [
+                      {
+                        id: 'call_123',
+                        type: 'function',
+                        function: {
+                          name: 'get_weather',
+                          arguments: '{"city":"Paris"}',
+                        },
+                      },
+                    ],
+                  },
                 },
-              },
-            ],
-          })
-        )
+              ],
+            })
+          )
+        }
+        return originalFetch(url, init)
       }
-      return originalFetch(url, init)
-    })
+    )
 
     // 2. Build Agent with Tools
     const agent = A99.custom({ ...batteryVM['atoms'] })

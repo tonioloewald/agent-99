@@ -16,39 +16,45 @@ describe('Use Case: Sophisticated Agents', () => {
       .varSet({ key: 'attempts', value: 0 })
       .varSet({ key: 'valid', value: false })
       .varSet({ key: 'answer', value: '' })
-      .while('!valid && attempts < 3', { valid: 'valid', attempts: 'attempts' }, (loop) =>
-        loop
-          // Predict
-          .step({
-            op: 'llmPredictBattery',
-            system: 'You are a quiz bot. Reply ONLY with A, B, C, or D.',
-            user: 'prompt',
-          })
-          .as('rawResponse') // Structure { content: string }
+      .while(
+        '!valid && attempts < 3',
+        { valid: 'valid', attempts: 'attempts' },
+        (loop) =>
+          loop
+            // Predict
+            .step({
+              op: 'llmPredictBattery',
+              system: 'You are a quiz bot. Reply ONLY with A, B, C, or D.',
+              user: 'prompt',
+            })
+            .as('rawResponse') // Structure { content: string }
 
-          // Extract Content
-          .varSet({ key: 'content', value: 'rawResponse.content' })
+            // Extract Content
+            .varSet({ key: 'content', value: 'rawResponse.content' })
 
-          // Validate
-          .if(
-            'content == "A" || content == "B" || content == "C" || content == "D"',
-            { content: 'content' },
-            (pass) =>
-              pass
-                .varSet({ key: 'valid', value: true })
-                .varSet({ key: 'answer', value: 'content' }),
-            (fail) =>
-              fail
-                // Increment attempts
-                .mathCalc({ expr: 'attempts + 1', vars: { attempts: 'attempts' } })
-                .as('attempts')
-                // Update Prompt to complain
-                .template({
-                  tmpl: '{{prev}}\nInvalid answer "{{bad}}". Please reply A, B, C, or D.',
-                  vars: { prev: 'prompt', bad: 'content' },
-                })
-                .as('prompt')
-          )
+            // Validate
+            .if(
+              'content == "A" || content == "B" || content == "C" || content == "D"',
+              { content: 'content' },
+              (pass) =>
+                pass
+                  .varSet({ key: 'valid', value: true })
+                  .varSet({ key: 'answer', value: 'content' }),
+              (fail) =>
+                fail
+                  // Increment attempts
+                  .mathCalc({
+                    expr: 'attempts + 1',
+                    vars: { attempts: 'attempts' },
+                  })
+                  .as('attempts')
+                  // Update Prompt to complain
+                  .template({
+                    tmpl: '{{prev}}\nInvalid answer "{{bad}}". Please reply A, B, C, or D.',
+                    vars: { prev: 'prompt', bad: 'content' },
+                  })
+                  .as('prompt')
+            )
       )
       .return(s.object({ answer: s.string, attempts: s.number }))
 
@@ -59,7 +65,7 @@ describe('Use Case: Sophisticated Agents', () => {
     let callCount = 0
     const caps = {
       llm: {
-        predict: mock(async (system, user) => {
+        predict: mock(async (_sys, _user) => {
           callCount++
           if (callCount === 1) return { content: 'Paris' }
           if (callCount === 2) return { content: 'A' }
@@ -96,67 +102,73 @@ describe('Use Case: Sophisticated Agents', () => {
       .varSet({ key: 'attempts', value: 0 })
       .varSet({ key: 'finalAnswer', value: '' })
 
-      .while('!found && attempts < 2', { found: 'found', attempts: 'attempts' }, (loop) =>
-        loop
-          // 1. Vectorize & Search
-          .step({ op: 'storeVectorize', text: 'currentQuery' })
-          .as('vec')
-          .step({ op: 'storeSearch', collection: 'docs', queryVector: 'vec' })
-          .as('docs')
+      .while(
+        '!found && attempts < 2',
+        { found: 'found', attempts: 'attempts' },
+        (loop) =>
+          loop
+            // 1. Vectorize & Search
+            .step({ op: 'storeVectorize', text: 'currentQuery' })
+            .as('vec')
+            .step({ op: 'storeSearch', collection: 'docs', queryVector: 'vec' })
+            .as('docs')
 
-          // 2. Judge
-          .jsonStringify({ value: 'docs' })
-          .as('context')
-          .step({
-            op: 'llmPredictBattery',
-            system: 'Judge relevance. Reply "YES" or "NO".',
-            user: 'Query: {{q}}\nDocs: {{c}}', // Template inside? No, step accepts string. We need template atom first.
-          }) // Wait, user prop needs string. We need to template it first.
-          
-          // Let's Template Judge Prompt
-          .template({
-            tmpl: 'Query: {{q}}\nDocs: {{c}}',
-            vars: { q: 'currentQuery', c: 'context' },
-          })
-          .as('judgePrompt')
-          
-          .step({
-            op: 'llmPredictBattery',
-            system: 'Judge relevance. Reply YES if relevant, NO otherwise.',
-            user: 'judgePrompt',
-          })
-          .as('judgment') // { content: "YES"|"NO" }
+            // 2. Judge
+            .jsonStringify({ value: 'docs' })
+            .as('context')
+            .step({
+              op: 'llmPredictBattery',
+              system: 'Judge relevance. Reply "YES" or "NO".',
+              user: 'Query: {{q}}\nDocs: {{c}}', // Template inside? No, step accepts string. We need template atom first.
+            }) // Wait, user prop needs string. We need to template it first.
 
-          .if(
-            // Use resolveValue dot notation logic by passing path string to expression?
-            // "judgment.content" in expression -> identifier "judgment", access "content".
-            // Since judgment is object { content: "YES" }, "judgment.content" works in JSEP.
-            // But if judgment is from state, variables must be resolved.
-            // Our evaluateExpression logic resolves vars from state if they are passed in 'vars' map.
-            // But we need to pass 'judgment' object to expression evaluator.
-            // vars: { judgment: 'judgment' } -> resolves 'judgment' var from state.
-            // So expr 'judgment.content' should work.
-            'judgment.content == "YES"',
-            { judgment: 'judgment' },
-            (yes) =>
-              yes
-                .varSet({ key: 'found', value: true })
-                // Generate Answer
-                .step({
-                  op: 'llmPredictBattery',
-                  system: 'Answer the question based on context.',
-                  user: 'judgePrompt',
-                })
-                .as('ans')
-                .varSet({ key: 'answer', value: 'ans.content' }),
-            (no) =>
-              no
-                .mathCalc({ expr: 'attempts + 1', vars: { attempts: 'attempts' } })
-                .as('attempts')
-                // Refine Query (Mock: Append " Inc")
-                .template({ tmpl: '{{q}} Inc', vars: { q: 'currentQuery' } })
-                .as('currentQuery')
-          )
+            // Let's Template Judge Prompt
+            .template({
+              tmpl: 'Query: {{q}}\nDocs: {{c}}',
+              vars: { q: 'currentQuery', c: 'context' },
+            })
+            .as('judgePrompt')
+
+            .step({
+              op: 'llmPredictBattery',
+              system: 'Judge relevance. Reply YES if relevant, NO otherwise.',
+              user: 'judgePrompt',
+            })
+            .as('judgment') // { content: "YES"|"NO" }
+
+            .if(
+              // Use resolveValue dot notation logic by passing path string to expression?
+              // "judgment.content" in expression -> identifier "judgment", access "content".
+              // Since judgment is object { content: "YES" }, "judgment.content" works in JSEP.
+              // But if judgment is from state, variables must be resolved.
+              // Our evaluateExpression logic resolves vars from state if they are passed in 'vars' map.
+              // But we need to pass 'judgment' object to expression evaluator.
+              // vars: { judgment: 'judgment' } -> resolves 'judgment' var from state.
+              // So expr 'judgment.content' should work.
+              'judgment.content == "YES"',
+              { judgment: 'judgment' },
+              (yes) =>
+                yes
+                  .varSet({ key: 'found', value: true })
+                  // Generate Answer
+                  .step({
+                    op: 'llmPredictBattery',
+                    system: 'Answer the question based on context.',
+                    user: 'judgePrompt',
+                  })
+                  .as('ans')
+                  .varSet({ key: 'answer', value: 'ans.content' }),
+              (no) =>
+                no
+                  .mathCalc({
+                    expr: 'attempts + 1',
+                    vars: { attempts: 'attempts' },
+                  })
+                  .as('attempts')
+                  // Refine Query (Mock: Append " Inc")
+                  .template({ tmpl: '{{q}} Inc', vars: { q: 'currentQuery' } })
+                  .as('currentQuery')
+            )
       )
       .return(s.object({ answer: s.string, attempts: s.number }))
 

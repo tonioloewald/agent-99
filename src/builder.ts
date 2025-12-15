@@ -1,11 +1,9 @@
-import { coreAtoms, type Atom } from './runtime'
+import { coreAtoms, type Atom, type OpCode } from './runtime'
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 type _AtomMap = typeof coreAtoms
 
 // --- AST Types ---
-
-export type OpCode = string
 
 export interface BaseNode {
   op: OpCode
@@ -56,6 +54,17 @@ interface ControlFlow<M extends Record<string, Atom<any, any>>> {
     items: any,
     as: string,
     steps: (b: BuilderType<M>) => BuilderType<M>
+  ): BuilderType<M>
+
+  memoize(
+    key: string,
+    steps: (b: BuilderType<M>) => BuilderType<M>
+  ): BuilderType<M>
+
+  cache(
+    key: string,
+    steps: (b: BuilderType<M>) => BuilderType<M>,
+    ttlMs?: number
   ): BuilderType<M>
 
   try(branches: {
@@ -185,11 +194,7 @@ export class TypedBuilder<M extends Record<string, Atom<any, any>>> {
     )
   }
 
-  map(
-    items: any,
-    as: string,
-    steps: (b: BuilderType<M>) => BuilderType<M>
-  ) {
+  map(items: any, as: string, steps: (b: BuilderType<M>) => BuilderType<M>) {
     const stepsB = new TypedBuilder(this.atoms)
     steps(stepsB as any)
     const mapAtom = this.atoms['map']
@@ -198,6 +203,35 @@ export class TypedBuilder<M extends Record<string, Atom<any, any>>> {
         items,
         as,
         steps: stepsB.steps,
+      })
+    )
+  }
+
+  memoize(key: string, steps: (b: BuilderType<M>) => BuilderType<M>) {
+    const stepsB = new TypedBuilder(this.atoms)
+    steps(stepsB as any)
+    const memoAtom = this.atoms['memoize']
+    return this.add(
+      memoAtom.create({
+        key,
+        steps: stepsB.steps,
+      })
+    )
+  }
+
+  cache(
+    key: string,
+    steps: (b: BuilderType<M>) => BuilderType<M>,
+    ttlMs?: number
+  ) {
+    const stepsB = new TypedBuilder(this.atoms)
+    steps(stepsB as any)
+    const cacheAtom = this.atoms['cache']
+    return this.add(
+      cacheAtom.create({
+        key,
+        steps: stepsB.steps,
+        ttlMs,
       })
     )
   }

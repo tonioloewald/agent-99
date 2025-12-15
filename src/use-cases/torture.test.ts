@@ -29,19 +29,25 @@ const createOrchestrator = () =>
       b
         .varSet({ key: 'attempts', value: 0 })
         .varSet({ key: 'success', value: false })
-        .while('!success && attempts < 3', { success: 'success', attempts: 'attempts' }, (loop) =>
-          loop.try({
-            try: (tBuilder) =>
-              tBuilder
-                .httpFetch({ url: 'item' })
-                .as('res')
-                .varSet({ key: 'result', value: 'res' })
-                .varSet({ key: 'success', value: true }),
-            catch: (c) =>
-              c
-                .mathCalc({ expr: 'attempts + 1', vars: { attempts: 'attempts' } })
-                .as('attempts'),
-          })
+        .while(
+          '!success && attempts < 3',
+          { success: 'success', attempts: 'attempts' },
+          (loop) =>
+            loop.try({
+              try: (tBuilder) =>
+                tBuilder
+                  .httpFetch({ url: 'item' })
+                  .as('res')
+                  .varSet({ key: 'result', value: 'res' })
+                  .varSet({ key: 'success', value: true }),
+              catch: (c) =>
+                c
+                  .mathCalc({
+                    expr: 'attempts + 1',
+                    vars: { attempts: 'attempts' },
+                  })
+                  .as('attempts'),
+            })
         )
     )
     .as('results')
@@ -96,11 +102,10 @@ describe('Torture Test', () => {
     const results = await Promise.all(
       workload.map(async (task) => {
         try {
-          const res = await vm.run(
-            task.ast,
-            task.input as any,
-            { capabilities: caps, fuel: 10000 }
-          )
+          const res = await vm.run(task.ast, task.input as any, {
+            capabilities: caps,
+            fuel: 10000,
+          })
           return { id: task.id, success: true, data: res.result, task }
         } catch (e: any) {
           return { id: task.id, success: false, error: e.message, task }
@@ -119,10 +124,14 @@ describe('Torture Test', () => {
       expect(res.success).toBe(true)
 
       if (res.task.type === 'fib') {
-        const expected = (res.task.expected as (...args: any[]) => any)(res.task.input.n)
+        const expected = (res.task.expected as (...args: any[]) => any)(
+          res.task.input.n
+        )
         expect(res.data.result).toBe(expected)
       } else {
-        const expected = (res.task.expected as (...args: any[]) => any)(res.task.input)
+        const expected = (res.task.expected as (...args: any[]) => any)(
+          res.task.input
+        )
         expect(res.data.results).toEqual(expected)
       }
     })

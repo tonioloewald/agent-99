@@ -6,11 +6,11 @@ Agent99 allows you to define complex logic chains, agents, and data pipelines us
 
 ## Features
 
--   **Environment Agnostic:** Runs in Node.js, Bun, Deno, and Browsers.
--   **Sandboxed VM:** No `eval()`. Safe math/logic parsing via `jsep`. Strict timeouts and gas limits.
--   **Type-Safe Builder:** Fluent API with TypeScript inference.
--   **JSON AST:** Logic is data. Serialize agents, send them over HTTP, or store them in a database.
--   **Capability-Based:** IO (Fetch, DB, AI) is injected at runtime, allowing perfect mocking and security control.
+- **Environment Agnostic:** Runs in Node.js, Bun, Deno, and Browsers.
+- **Sandboxed VM:** No `eval()`. Safe math/logic parsing via `jsep`. Strict timeouts and gas limits.
+- **Type-Safe Builder:** Fluent API with TypeScript inference.
+- **JSON AST:** Logic is data. Serialize agents, send them over HTTP, or store them in a database.
+- **Capability-Based:** IO (Fetch, DB, AI) is injected at runtime, allowing perfect mocking and security control.
 
 ## Installation
 
@@ -75,25 +75,27 @@ console.log(result.fuelUsed) // Gas consumed
 
 The standard library includes essential primitives:
 
-| Category | Atoms | Description |
-| --- | --- | --- |
-| **Flow** | `seq`, `if`, `while`, `return`, `try` | Control flow and loops. |
-| **State** | `varSet`, `varGet`, `scope` | variable management. |
-| **Math** | `mathCalc` | Safe expression evaluation (e.g. `"a + b"`). |
-| **Logic** | `eq`, `gt`, `and`, `not`, ... | Boolean logic. |
-| **IO** | `httpFetch` | HTTP requests. |
-| **Store** | `storeGet`, `storeSet` | Key-Value storage. |
-| **AI** | `llmPredict`, `agentRun` | LLM calls and sub-agent recursion. |
-| **Utils** | `random`, `uuid` | Random generation (Crypto-secure if available). |
+| Category         | Atoms                                 | Description                                     |
+| ---------------- | ------------------------------------- | ----------------------------------------------- |
+| **Flow**         | `seq`, `if`, `while`, `return`, `try` | Control flow and loops.                         |
+| **State**        | `varSet`, `varGet`, `scope`           | variable management.                            |
+| **Math**         | `mathCalc`                            | Safe expression evaluation (e.g. `"a + b"`).    |
+| **Logic**        | `eq`, `gt`, `and`, `not`, ...         | Boolean logic.                                  |
+| **IO**           | `httpFetch`                           | HTTP requests.                                  |
+| **Store**        | `storeGet`, `storeSet`                | Key-Value storage.                              |
+| **AI**           | `llmPredict`, `agentRun`              | LLM calls and sub-agent recursion.              |
+| **Utils**        | `random`, `uuid`                      | Random generation (Crypto-secure if available). |
+| **Optimization** | `memoize`, `cache`                    | In-memory memoization and persistent caching.   |
 
 ## Capabilities & Security
 
 Agent99 uses a **Capability-Based Security** model. The VM cannot access the network, file system, or database unless provided with a Capability.
 
 **Zero Config Defaults:** The runtime provides sensible defaults for local development:
-*   `httpFetch` uses the global `fetch`.
-*   `store` uses an in-memory `Map` (ephemeral).
-*   `random`/`uuid` use `crypto` or `Math`.
+
+- `httpFetch` uses the global `fetch`.
+- `store` uses an in-memory `Map` (ephemeral).
+- `random`/`uuid` use `crypto` or `Math`.
 
 In production, you should inject secure, instrumented, or cloud-native implementations (e.g., restricted fetch, Postgres, Redis).
 
@@ -101,9 +103,9 @@ In production, you should inject secure, instrumented, or cloud-native implement
 
 For local AI development, Agent99 provides a standard library of "Batteries" that enable Vector Search and LLM features without external API keys.
 
-*   **Vector:** Local embeddings via `@xenova/transformers`.
-*   **Store:** In-memory Vector Store via `@orama/orama`.
-*   **LLM:** Bridge to LM Studio (`http://localhost:1234`).
+- **Vector:** Local embeddings via `@xenova/transformers`.
+- **Store:** In-memory Vector Store via `@orama/orama`.
+- **LLM:** Bridge to LM Studio (`http://localhost:1234`).
 
 ### Usage
 
@@ -116,13 +118,19 @@ import { storeVectorize, storeSearch, llmPredictBattery } from 'agent-99'
 const vm = new AgentVM({
   storeVectorize,
   storeSearch,
-  llmPredictBattery
+  llmPredictBattery,
 })
 
 await vm.run(ast, args, { capabilities: batteries })
 ```
 
-### Implementing Real-World Atoms
+### Performance & Tree Shaking
+
+The core Agent99 runtime is extremely lightweight (~7KB gzipped).
+
+The "Batteries" dependencies (transformers, Orama) are **lazy-loaded**. This means the heavy dependencies are only downloaded or bundled if you explicitly import and use the battery capabilities. If you only use the core runtime, your application bundle remains small.
+
+## Implementing Real-World Atoms
 
 To enable custom capabilities like Database Access or Web Scraping, you inject them into the `VM.run` call.
 
@@ -209,10 +217,8 @@ chain.if(
 ### While Loop
 
 ```typescript
-chain.while(
-  'n > 0',
-  { n: 'n' },
-  (loop) => loop.mathCalc({ expr: 'n - 1', vars: { n: 'n' } }).as('n')
+chain.while('n > 0', { n: 'n' }, (loop) =>
+  loop.mathCalc({ expr: 'n - 1', vars: { n: 'n' } }).as('n')
 )
 ```
 
