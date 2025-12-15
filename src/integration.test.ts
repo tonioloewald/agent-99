@@ -6,7 +6,7 @@ import { s } from 'tosijs-schema'
 describe('Agent99 Integration (Mocked Pipeline)', () => {
   it('should execute a Credit Limit Check flow using Store and If/Else', async () => {
     // --- 1. Mock Capabilities ---
-    const mockStore = {
+    const mockStore: Record<string, number> = {
       'user:123:limit': 500,
     }
 
@@ -28,7 +28,7 @@ describe('Agent99 Integration (Mocked Pipeline)', () => {
       })
     )
       // Get Limit
-      .storeGet('user:123:limit')
+      ['store.get']({ key: 'user:123:limit' })
       .as('limit') // Hardcoded key for MVP simplicity in builder args
 
       // Check Limit
@@ -39,17 +39,21 @@ describe('Agent99 Integration (Mocked Pipeline)', () => {
           limit: A99.val('limit'),
         },
         // THEN: Deny
-        (b) =>
-          b
-            .calc('0', {})
+        (b: any) =>
+          b['math.calc']({ expr: '0', vars: {} })
             .as('approved') // 0 = false
-            .fetch('https://api.bank.com/log-denial', { method: 'POST' }),
+            ['http.fetch']({
+              url: 'https://api.bank.com/log-denial',
+              method: 'POST',
+            }),
         // ELSE: Approve
-        (b) =>
-          b
-            .calc('1', {})
+        (b: any) =>
+          b['math.calc']({ expr: '1', vars: {} })
             .as('approved') // 1 = true
-            .fetch('https://api.bank.com/log-approval', { method: 'POST' })
+            ['http.fetch']({
+              url: 'https://api.bank.com/log-approval',
+              method: 'POST',
+            })
       )
       .return(s.object({ approved: s.number }))
 
@@ -88,14 +92,14 @@ describe('Agent99 Integration (Mocked Pipeline)', () => {
 
   it('should handle capability errors gracefully', async () => {
     const logic = A99.take(s.object({}))
-      .fetch('https://google.com') // Needs fetch capability
+      ['http.fetch']({ url: 'https://google.com' }) // Needs fetch capability
       .return(s.object({}))
 
     const ast = logic.toJSON()
 
     // Run without capabilities
     expect(VM.run(ast, {})).rejects.toThrow(
-      "Capability Error: 'http.fetch' is not available in this runtime."
+      "Capability 'fetch' missing"
     )
   })
 })

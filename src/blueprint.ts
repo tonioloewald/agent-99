@@ -25,12 +25,18 @@ export const blueprint: XinBlueprint = async (tag, factory) => {
     // Reads a number from the input, adds tax, and returns it.
     private agentLogic = A99.take(s.object({ inputVal: s.number }))
       // 1. Calculate Tax
-      .calc('inputVal * 0.2', { inputVal: A99.args('inputVal') })
+      ['math.calc']({
+        expr: 'inputVal * 0.2',
+        vars: { inputVal: A99.args('inputVal') },
+      })
       .as('tax')
       // 2. Calculate Total
-      .calc('inputVal + tax', {
-        inputVal: A99.args('inputVal'),
-        tax: A99.val('tax'),
+      ['math.calc']({
+        expr: 'inputVal + tax',
+        vars: {
+          inputVal: A99.args('inputVal'),
+          tax: A99.val('tax'),
+        },
       })
       .as('total')
       // 3. Return
@@ -148,12 +154,12 @@ export const blueprint: XinBlueprint = async (tag, factory) => {
               },
               pre(JSON.stringify(this.result, null, 2))
             )
-          : null
+          : ''
       )
   }
 
   return {
-    type: Agent99Demo,
+    type: Agent99Demo as any,
     styleSpec: {
       ':host': {
         display: 'block',
@@ -164,7 +170,7 @@ export const blueprint: XinBlueprint = async (tag, factory) => {
 }
 
 // Re-export Core Logic for Consumers
-export * from './builder'
+export { A99, TypedBuilder, type BaseNode, type SeqNode } from './builder'
 export * from './runtime'
 export * from './atoms/browser'
 

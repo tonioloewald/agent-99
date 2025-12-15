@@ -1,6 +1,6 @@
-import { calc, iff, fetch, storeGet, storeSet, ret } from './runtime'
+import { coreAtoms, type Atom } from './runtime'
 
-// --- AST Node Definitions ---
+// --- AST Types ---
 
 export type OpCode = string
 
@@ -16,201 +16,172 @@ export interface SeqNode extends BaseNode {
 
 // --- Helpers ---
 
-// Marker for Argument References
 export interface ArgRef {
   $kind: 'arg'
   path: string
 }
 
-// --- Builder ---
+// --- Typed Builder ---
 
-export class Builder {
-  // Public for internal access by if() callbacks
-  public steps: BaseNode[] = []
-  private _inputSchema?: any
-  private _outputSchema?: any
+type AtomMap = typeof coreAtoms
 
-  constructor(inputSchema?: any) {
-    this._inputSchema = inputSchema
-  }
+// Helper to extract input type from Atom definition
+type AtomInput<T> = T extends Atom<infer I, any> ? I : never
 
-  /**
-   * Adds a step to the sequence
-   */
-  private add(step: BaseNode) {
-    this.steps.push(step)
-    return this
-  }
+// The Builder instance type with dynamic methods inferred from AtomMap
+type BuilderMethods<M extends Record<string, Atom<any, any>>> = {
+  [K in keyof M as M[K]['op']]: (input: AtomInput<M[K]>) => BuilderType<M>
+}
 
-  /**
-   * Generic Extension: Add any raw atom node.
-   */
-  step(node: BaseNode) {
-    return this.add(node)
-  }
-
-  /**
-   * Math Atom: Safe arithmetic parsing.
-   * @param expr Math expression string (e.g. "a + b * c")
-   * @param vars Variable bindings
-   */
-  calc(expr: string, vars: Record<string, any>) {
-    return this.add(
-      calc.create({
-        expr,
-        vars,
-      })
-    )
-  }
-
-  /**
-   * Control Flow: If / Else
-   * @param condition Expression to evaluate (e.g. "price > 100")
-   * @param vars Variable bindings for the condition
-   * @param thenBranch Callback to build the 'then' sequence
-   * @param elseBranch Optional callback to build the 'else' sequence
-   */
+// Control Flow Extensions (Custom signatures)
+interface ControlFlow<M extends Record<string, Atom<any, any>>> {
   if(
     condition: string,
     vars: Record<string, any>,
-    thenBranch: (b: Builder) => Builder,
-    elseBranch?: (b: Builder) => Builder
-  ) {
-    const thenBuilder = new Builder()
-    thenBranch(thenBuilder)
+    thenBranch: (b: BuilderType<M>) => BuilderType<M>,
+    elseBranch?: (b: BuilderType<M>) => BuilderType<M>
+  ): BuilderType<M>
 
-    let elseSteps: BaseNode[] | undefined
-    if (elseBranch) {
-      const elseBuilder = new Builder()
-      elseBranch(elseBuilder)
-      elseSteps = elseBuilder.steps
-    }
+  while(
+    condition: string,
+    vars: Record<string, any>,
+    body: (b: BuilderType<M>) => BuilderType<M>
+  ): BuilderType<M>
 
-    return this.add(
-      iff.create({
-        condition,
-        vars,
-        then: thenBuilder.steps as any, // Cast to match atom schema type if needed
-        else: elseSteps as any,
-      })
-    )
+  scope(steps: (b: BuilderType<M>) => BuilderType<M>): BuilderType<M>
+}
+
+export class TypedBuilder<M extends Record<string, Atom<any, any>>> {
+  public steps: BaseNode[] = []
+  private atoms: M
+  private proxy: any
+
+  constructor(atoms: M) {
+    this.atoms = atoms
+
+    // Proxy to handle dynamic atom calls
+    this.proxy = new Proxy(this, {
+      get: (target, prop: string | symbol, receiver) => {
+        // 1. Check for class methods (as, step, toJSON, etc.)
+        if (prop in target) return (target as any)[prop]
+
+        // 2. Dynamic atom methods
+        if (typeof prop === 'string' && prop in target.atoms) {
+          return (input: any) => {
+            const atom = target.atoms[prop]
+            target.add(atom.create(input))
+            return receiver
+          }
+        }
+
+        return undefined
+      },
+    })
+
+    return this.proxy
   }
 
-  /**
-   * IO: HTTP Fetch
-   */
-  fetch(
-    url: string,
-    options: {
-      method?: string
-      body?: any
-      headers?: Record<string, string>
-    } = {}
-  ) {
-    return this.add(
-      fetch.create({
-        url,
-        ...options,
-      })
-    )
+  private add(step: BaseNode): BuilderType<M> {
+    this.steps.push(step)
+    return this.proxy
   }
 
-  /**
-   * Store: Get a value from the KV store
-   */
-  storeGet(key: string) {
-    return this.add(
-      storeGet.create({
-        key,
-      })
-    )
+  // --- Core Fluent API ---
+
+  as(variableName: string): BuilderType<M> {
+    if (this.steps.length === 0) throw new Error('No step to capture')
+    const last = this.steps[this.steps.length - 1]
+    last.result = variableName
+    return this.proxy
   }
 
-  /**
-   * Store: Set a value in the KV store
-   */
-  storeSet(key: string, value: any) {
-    return this.add(
-      storeSet.create({
-        key,
-        value,
-      })
-    )
+  step(node: BaseNode): BuilderType<M> {
+    return this.add(node)
   }
 
-  /**
-   * Captures the result of the *last* operation into a named variable in the state.
-   * @param variableName Name of the variable to set
-   */
-  as(variableName: string) {
-    if (this.steps.length === 0) {
-      throw new Error(
-        'A99 Builder Error: .as() called without a preceding operation.'
-      )
-    }
-    const lastStep = this.steps[this.steps.length - 1]
-
-    // Mutate the last step to add the result register
-    // This assumes the last step supports 'result'.
-    lastStep.result = variableName
-
-    return this
+  return(schema: any): BuilderType<M> {
+    const atom = this.atoms['return']
+    if (!atom) throw new Error("Atom 'return' not found")
+    return this.add(atom.create({ schema: schema.schema ?? schema }))
   }
 
-  /**
-   * Ends the chain and defines the output contract.
-   * @param schema Output schema definition
-   */
-  return(schema: any) {
-    this._outputSchema = schema
-
-    return this.add(
-      ret.create({
-        schema: schema.schema,
-      })
-    )
-  }
-
-  /**
-   * Serializes the logic chain to the JSON AST.
-   */
   toJSON(): SeqNode {
     return {
       op: 'seq',
       steps: [...this.steps],
     }
   }
+
+  // --- Control Flow Helpers ---
+
+  if(
+    condition: string,
+    vars: Record<string, any>,
+    thenBranch: (b: BuilderType<M>) => BuilderType<M>,
+    elseBranch?: (b: BuilderType<M>) => BuilderType<M>
+  ) {
+    const thenB = new TypedBuilder(this.atoms)
+    thenBranch(thenB as any)
+
+    let elseSteps
+    if (elseBranch) {
+      const elseB = new TypedBuilder(this.atoms)
+      elseBranch(elseB as any)
+      elseSteps = elseB.steps
+    }
+
+    // Uses the 'if' atom from map
+    const ifAtom = this.atoms['if']
+    return this.add(
+      ifAtom.create({
+        condition,
+        vars,
+        then: thenB.steps,
+        else: elseSteps,
+      })
+    )
+  }
+
+  while(
+    condition: string,
+    vars: Record<string, any>,
+    body: (b: BuilderType<M>) => BuilderType<M>
+  ) {
+    const bodyB = new TypedBuilder(this.atoms)
+    body(bodyB as any)
+    const whileAtom = this.atoms['while']
+    return this.add(
+      whileAtom.create({
+        condition,
+        vars,
+        body: bodyB.steps,
+      })
+    )
+  }
 }
+
+// Combine dynamic atom methods with class methods
+export type BuilderType<M extends Record<string, Atom<any, any>>> =
+  TypedBuilder<M> & BuilderMethods<M> & ControlFlow<M>
 
 // --- API Surface ---
 
 export const A99 = {
-  /**
-   * Begin a logic chain by defining the input schema.
-   */
-  take(schema: any) {
-    return new Builder(schema)
+  // Create a builder with default core atoms
+  take(schema?: any): BuilderType<typeof coreAtoms> {
+    return new TypedBuilder(coreAtoms) as any
   },
 
-  /**
-   * Create a reference to an input argument.
-   * Usage: A99.args('user.id')
-   */
+  // Create a customized builder
+  custom<M extends Record<string, Atom<any, any>>>(atoms: M): BuilderType<M> {
+    return new TypedBuilder(atoms) as any
+  },
+
   args(path: string): ArgRef {
     return { $kind: 'arg', path }
   },
 
-  /**
-   * Create a reference to a variable in the current state scope.
-   * Usage: A99.val('myVar')
-   */
   val(path: string): string {
-    // For now, simple strings in 'vars' mappings are treated as state keys by the runtime
     return path
-  },
-
-  // run() placeholder for future VM implementation
-  async run(_ast: Builder | SeqNode, _input: any): Promise<any> {
-    throw new Error('Runtime not yet implemented.')
   },
 }

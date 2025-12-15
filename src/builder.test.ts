@@ -10,9 +10,12 @@ describe('Agent99 Builder', () => {
         tax: s.number,
       })
     )
-      .calc('price * (1 + tax)', {
-        price: A99.args('price'),
-        tax: A99.args('tax'),
+      ['math.calc']({
+        expr: 'price * (1 + tax)',
+        vars: {
+          price: A99.args('price'),
+          tax: A99.args('tax'),
+        },
       })
       .as('total')
       .return(s.object({ total: s.number }))
@@ -42,7 +45,7 @@ describe('Agent99 Builder', () => {
   it('should throw error when using .as() at start of chain', () => {
     expect(() => {
       A99.take(s.object({})).as('fail')
-    }).toThrow('A99 Builder Error: .as() called without a preceding operation.')
+    }).toThrow('No step to capture')
   })
 
   it('should generate arg references correctly', () => {
@@ -52,9 +55,12 @@ describe('Agent99 Builder', () => {
 
   it('should allow chaining multiple operations', () => {
     const chain = A99.take(s.object({ x: s.number }))
-      .calc('x * 2', { x: A99.args('x') })
+      ['math.calc']({ expr: 'x * 2', vars: { x: A99.args('x') } })
       .as('doubleX')
-      .calc('doubleX + 10', { doubleX: A99.args('doubleX') })
+      ['math.calc']({
+        expr: 'doubleX + 10',
+        vars: { doubleX: A99.args('doubleX') },
+      })
       .as('result')
       .return(s.object({ result: s.number }))
 

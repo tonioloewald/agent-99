@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'bun:test'
-import { VM, defineAtom } from './runtime'
+import { VM, defineAtom, AgentVM } from './runtime'
 import { A99 } from './builder'
 import { s } from 'tosijs-schema'
 
@@ -30,12 +30,15 @@ describe('Agent99 Runtime (VM)', () => {
     // 1. Build
     // Calculates: price * (1 + tax)
     const logic = A99.take(s.object({ price: s.number, tax: s.number }))
-      .calc('price * (1 + tax)', {
-        price: A99.args('price'),
-        tax: A99.args('tax'),
+      ['math.calc']({
+        expr: 'price * (1 + tax)',
+        vars: {
+          price: A99.args('price'),
+          tax: A99.args('tax'),
+        },
       })
       .as('total')
-      .return(s.object({ total: s.number }))
+      ['return']({ schema: s.object({ total: s.number }).schema })
 
     // 2. Serialize
     const ast = logic.toJSON()
@@ -88,7 +91,7 @@ describe('Agent99 Runtime (VM)', () => {
     // Step 1: Fuel 2 -> 1. OK.
     // Step 2: Fuel 1 -> 0. OK.
     // Step 3: Fuel 0. Error.
-    expect(VM.run(ast, {}, { fuel: 2 })).rejects.toThrow('Agent99: Out of Fuel')
+    expect(VM.run(ast, {}, { fuel: 2 })).rejects.toThrow('Out of Fuel')
   })
 
   it('should return strict subsets of state based on schema', async () => {
@@ -122,7 +125,7 @@ describe('Agent99 Runtime (VM)', () => {
   })
 
   it('should enforce atom timeouts', async () => {
-    defineAtom(
+    const slowAtom = defineAtom(
       'test.slow',
       s.any,
       undefined,
@@ -132,11 +135,13 @@ describe('Agent99 Runtime (VM)', () => {
       { timeoutMs: 10 }
     )
 
+    const vm = new AgentVM({ 'test.slow': slowAtom })
+
     const ast = {
       op: 'seq',
       steps: [{ op: 'test.slow' }],
     } as any
 
-    expect(VM.run(ast, {})).rejects.toThrow("Atom 'test.slow' timed out after 10ms")
+    expect(vm.run(ast, {})).rejects.toThrow("Atom 'test.slow' timed out")
   })
 })
