@@ -1,5 +1,7 @@
 # Agent99
 
+[github](https://github.com/tonioloewald/agent-99#readme) | [npm](https://www.npmjs.com/package/agent-99) | [discord](https://discord.gg/ramJ9rgky5)
+
 A **type-safe-by-design, cost-limited virtual machine** that enables the **safe execution of untrusted code** anywhere.
 
 It's **safe eval** in the cloud.
