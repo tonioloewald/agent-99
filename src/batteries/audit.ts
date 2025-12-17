@@ -1,4 +1,3 @@
-import * as readline from 'node:readline'
 let memoryCache: ModelAudit[] | null = null
 
 const TIMEOUT_MS = 60000
@@ -184,8 +183,13 @@ export async function auditModels(baseUrl: string): Promise<ModelAudit[]> {
   const results: ModelAudit[] = []
   const modelList = serverModelIds.map((id) => ({ id }))
 
+  let readline: typeof import('node:readline') | undefined
+  if (!isBrowser) {
+    readline = await import('node:readline')
+  }
+
   for (const model of modelList) {
-    if (!isBrowser) {
+    if (!isBrowser && readline) {
       readline.cursorTo(process.stdout, 0)
       process.stdout.write(`👉 Testing: ${model.id}...`)
       readline.clearLine(process.stdout, 1)
@@ -207,7 +211,7 @@ export async function auditModels(baseUrl: string): Promise<ModelAudit[]> {
         structured = structRes.ok
         statusMsg = structured ? structRes.msg! : `Fail: ${structRes.msg}`
       } else {
-        statusMsg = 'LLM Fail'
+        statusMsg = 'LL-M Fail'
       }
     }
 
@@ -219,7 +223,7 @@ export async function auditModels(baseUrl: string): Promise<ModelAudit[]> {
       status: statusMsg,
     })
   }
-  if (!isBrowser) {
+  if (!isBrowser && readline) {
     readline.cursorTo(process.stdout, 0)
     readline.clearLine(process.stdout, 0)
   }
