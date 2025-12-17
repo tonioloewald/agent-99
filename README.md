@@ -8,6 +8,8 @@ A **type-safe-by-design, cost-limited virtual machine** that enables the **safe 
 
 It's **safe eval** in the cloud.
 
+And it's **tiny**, ~8kB gzipped.
+
 Agent99 allows you to define complex logic chains, agents, and data pipelines—_computer programs_—using a fluent TypeScript builder. These definitions compile to a safe, JSON-serializable AST ([Abstract Syntax Tree](https://en.wikipedia.org/wiki/Abstract_syntax_tree)) that can be executed in the browser, on the server, or at the edge.
 
 ### Why do you care?
@@ -234,12 +236,6 @@ const logic = vm.A99.llmPredictBattery({
 
 - **Connection Error:** If you see an error like `Failed to connect to LM Studio`, make sure the LM Studio server is running on the default port (`1234`).
 - **No Models Found:** Ensure you have downloaded compatible GGUF models and they are loaded in LM Studio. The audit process will warn you if it cannot find suitable LLM or embedding models.
-
-### Performance & Tree Shaking
-
-The core Agent99 runtime is extremely lightweight (~8KB gzipped).
-
-The "Batteries" dependencies (transformers, Orama) are **lazy-loaded**. This means the heavy dependencies are only downloaded or bundled if you explicitly import and use the battery capabilities. If you only use the core runtime, your application bundle remains small.
 
 ## Self-Documentation for Agents
 
