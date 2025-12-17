@@ -1,5 +1,7 @@
 # Agent99 Technical Context
 
+**Note:** This document provides a technical deep-dive into Agent99's architecture and security model. For a general overview, installation instructions, and usage examples, please refer to the main [README.md](./README.md).
+
 **Agent99** is a secure, environment-agnostic runtime for executing AI agents and logic chains defined as JSON ASTs.
 
 ## 1. Architecture
@@ -68,42 +70,11 @@ The standard library (Core Atoms) provides essential primitives. All atom names 
 
 ## 3. Batteries Included (Local AI & Vectors)
 
-Agent99 includes a "Batteries Included" setup for local development that uses [LM Studio](https://lmstudio.ai/) for model inference and has a built-in, zero-dependency vector search. This replaces the previous reliance on `@xenova/transformers` and `@orama/orama`.
+Agent99 includes a "Batteries Included" setup for local development that provides zero-dependency vector search and local model inference via [LM Studio](https://lmstudio.ai/). For setup and usage details, see the [Batteries Included section in README.md](./README.md#batteries-included-zero-dependency-local-ai).
 
-On initial import, the `batteries` module audits the available models on the LM Studio server (`http://localhost:1234`) and caches the results for the current session to avoid redundant checks. The cache uses `localStorage` in browser environments and a temporary in-memory store elsewhere. It automatically selects appropriate models for embedding and LLM tasks.
+This approach replaces the previous reliance on heavy client-side libraries like `@xenova/transformers` and `@orama/orama`. On initial import, the `batteries` module audits the available models on the LM Studio server and caches the results to avoid redundant checks.
 
-To use the batteries, register the `batteryAtoms` with the `AgentVM` and provide the `batteries` capabilities object during execution.
-
-```typescript
-import { AgentVM, batteries, batteryAtoms } from 'agent-99'
-
-// Register battery-specific atoms
-const vm = new AgentVM(batteryAtoms)
-
-// Use vm.A99 to access battery atoms
-const logic = vm.A99.storeVectorize({ text: 'Hello' })
-
-// Pass the battery capabilities to the run command
-await vm.run(logic.toJSON(), args, { capabilities: batteries })
-```
-
-## 4. Extending Agent99
-
-You can define custom atoms using `defineAtom`.
-
-```typescript
-import { defineAtom, s } from 'agent-99'
-
-const myAtom = defineAtom(
-  'myOp',
-  s.object({ val: s.string }),
-  s.string,
-  async ({ val }, ctx) => val.toUpperCase(),
-  { cost: 5 }
-)
-```
-
-## 5. Expression Syntax (JSEP)
+## 4. Expression Syntax (JSEP)
 
 Expressions in `mathCalc`, `if`, and `while` use a safe subset of JavaScript via `jsep`.
 
@@ -113,9 +84,17 @@ For security, these expressions are sandboxed and cannot directly access the age
 - **Forbidden:** Function calls, `new`, `this`, global access (except `Math` via atoms).
 - **Security:** Prototype access (`__proto__`, `constructor`) is strictly blocked.
 
-## 6. Security Model
+## 5. Security Model
 
 - **Capabilities:** The VM has no default IO. You must provide `fetch`, `store`, etc., allowing you to mock, proxy, or limit access.
 - **Fuel:** Every atom consumes "fuel". Execution aborts if fuel reaches 0.
 - **Timeouts:** Atoms have a default timeout (1s) to prevent hangs.
 - **State Isolation:** Each run creates a fresh context. Scopes (loops/maps) use prototype inheritance to isolate local variables.
+
+## 6. Development & Validation
+
+After making changes to the codebase, it's important to run both the test suite and the type checker to ensure correctness and maintain type safety.
+
+- **Run Tests:** `bun test`
+- **Check Types:** `bun typecheck`
+

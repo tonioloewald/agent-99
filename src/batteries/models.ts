@@ -37,36 +37,44 @@ export class LocalModels {
     return this.models
   }
 
-  setDefaultLLM(modelId: string) {
-    const model = this.models.find((m) => m.id === modelId && m.type === 'LLM')
+  private _setDefaultModel(
+    modelId: string,
+    property: 'defaultLLM' | 'defaultEmbedding' | 'defaultStructuredLLM',
+    predicate: (model: ModelAudit) => boolean,
+    errorType: string
+  ) {
+    const model = this.models.find((m) => m.id === modelId && predicate(m))
     if (!model) {
-      throw new Error(`Model ${modelId} not found or is not an LLM.`)
+      throw new Error(`Model '${modelId}' not found or is not ${errorType}.`)
     }
-    this.defaultLLM = model
+    this[property] = model
+  }
+
+  setDefaultLLM(modelId: string) {
+    this._setDefaultModel(
+      modelId,
+      'defaultLLM',
+      (m) => m.type === 'LLM',
+      'an LLM'
+    )
   }
 
   setDefaultEmbedding(modelId: string) {
-    const model = this.models.find(
-      (m) => m.id === modelId && m.type === 'Embedding'
+    this._setDefaultModel(
+      modelId,
+      'defaultEmbedding',
+      (m) => m.type === 'Embedding',
+      'an embedding model'
     )
-    if (!model) {
-      throw new Error(
-        `Model ${modelId} not found or is not an embedding model.`
-      )
-    }
-    this.defaultEmbedding = model
   }
 
   setDefaultStructuredLLM(modelId: string) {
-    const model = this.models.find(
-      (m) => m.id === modelId && m.type === 'LLM' && m.structuredOutput
+    this._setDefaultModel(
+      modelId,
+      'defaultStructuredLLM',
+      (m) => m.type === 'LLM' && m.structuredOutput,
+      'a structured-output LLM'
     )
-    if (!model) {
-      throw new Error(
-        `Model ${modelId} not found or is not a structured-output LLM.`
-      )
-    }
-    this.defaultStructuredLLM = model
   }
 
   getLLM() {

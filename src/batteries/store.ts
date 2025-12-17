@@ -18,7 +18,7 @@ const collections = new Map<string, any[]>()
 
 function cosineSimilarity(vecA: number[], vecB: number[]): number {
   if (vecA.length !== vecB.length) {
-    return -Infinity // Or throw an error
+    throw new Error('Vectors must have the same length for cosine similarity.')
   }
   let dotProduct = 0
   let magA = 0

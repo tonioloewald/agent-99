@@ -1,6 +1,6 @@
 import { describe, it, expect, mock } from 'bun:test'
 import { A99 } from '../builder'
-import { defineAtom, resolveValue } from '../runtime'
+import { defineAtom, resolveValue, type Capabilities } from '../runtime'
 import { AgentVM } from '../vm'
 import { s } from 'tosijs-schema'
 import { llmPredictBattery } from '../atoms/batteries'
@@ -69,7 +69,10 @@ describe('Use Case: Comparison (Honed API)', () => {
     const result = await vm.run(
       researchAgent.toJSON(),
       { topic: 'AI' },
-      { capabilities: caps as any }
+      // This test uses a custom `llmPredictBattery` atom which expects a different
+      // signature for `llm.predict` than the standard `Capabilities` type.
+      // The cast is necessary to satisfy the type checker.
+      { capabilities: caps as unknown as Capabilities }
     )
 
     // 5. Verify
